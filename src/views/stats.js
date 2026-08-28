@@ -1,12 +1,17 @@
 // Écran Statistiques : moyenne de putts globale, deux graphiques (putting, score
-// stableford ramené à 18 trous) sur les parties terminées, un tableau de distance
-// moyenne mesurée par club, et une analyse lie/style de coup — ces deux derniers tous
-// rounds confondus (y compris en cours). En mode Simplifié, seules les statistiques
-// score/putts (résumé + deux graphiques) restent affichées.
+// stableford ramené à 18 trous), un tableau de distance moyenne par club, et une analyse
+// lie/style de coup. Un seul jeu de filtres (Golf, Année, Mois, Club) en haut de l'écran ;
+// chaque section n'applique que les filtres qui la concernent :
+//   - Moyenne de putts + graphiques : Golf/Année/Mois uniquement (le filtre Club n'a pas de
+//     sens à l'échelle d'un round entier ; les lignes objectif restent affichées quel que
+//     soit le filtre).
+//   - Distance par club et analyse lie/style : Golf/Année/Mois + Club.
+// En mode Simplifié, seules les statistiques score/putts restent affichées (pas de filtre
+// Club, les sections club/coup étant elles-mêmes masquées).
 
 import { getRounds, getClubs, getCourses, getPlayer } from '../db/repository.js';
 import { buildLineChart } from '../ui/lineChart.js';
-import { createField } from '../ui/formHelpers.js';
+import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
 import { LIE_OPTIONS, SHAPE_OPTIONS } from '../data/shotOptions.js';
 
 function formatShortDate(dateStr) {
@@ -21,12 +26,15 @@ function wrapScroll(table) {
   return wrap;
 }
 
-function computeClubDistanceStats(allRounds, clubs) {
+// --- Distance moyenne par club ---
+
+function computeClubDistanceStats(rounds, clubs, clubFilterId) {
   const stats = new Map();
-  allRounds.forEach((round) => {
+  rounds.forEach((round) => {
     round.holeScores.forEach((hs) => {
       (hs.shots ?? []).forEach((shot) => {
         if (!shot.isFullShot || shot.distance == null || !shot.clubId) return;
+        if (clubFilterId && shot.clubId !== clubFilterId) return;
         const entry = stats.get(shot.clubId) ?? { sum: 0, count: 0 };
         entry.sum += shot.distance;
         entry.count += 1;
@@ -53,7 +61,7 @@ function buildClubDistanceSection(clubStats) {
   if (clubStats.length === 0) {
     const hint = document.createElement('p');
     hint.className = 'hint';
-    hint.textContent = "Aucune distance mesurée pour le moment (les coups pleins avec distance alimentent ce tableau).";
+    hint.textContent = "Aucune distance mesurée pour ces filtres (les coups pleins avec distance alimentent ce tableau).";
     section.appendChild(hint);
     return section;
   }
@@ -77,24 +85,14 @@ function buildClubDistanceSection(clubStats) {
 
 // --- Analyse lie / style de coup ---
 
-function collectShotsWithRound(allRounds) {
+function collectShotsWithRound(rounds) {
   const items = [];
-  allRounds.forEach((round) => {
+  rounds.forEach((round) => {
     round.holeScores.forEach((hs) => {
       (hs.shots ?? []).forEach((shot) => items.push({ shot, round }));
     });
   });
   return items;
-}
-
-function matchesFilters(item, { courseId, year, month }) {
-  if (courseId && item.round.courseId !== courseId) return false;
-  if (year || month) {
-    const d = new Date(`${item.round.date}T00:00:00`);
-    if (year && String(d.getFullYear()).slice(-2) !== year) return false;
-    if (month && String(d.getMonth() + 1).padStart(2, '0') !== month) return false;
-  }
-  return true;
 }
 
 function distributionTable(shots, field, options, label) {
@@ -142,17 +140,20 @@ function buildLieShapeContent(shots, clubs) {
 
   if (globalLieTable) {
     const h = document.createElement('h3');
-    h.textContent = 'Lie — répartition globale';
+    h.textContent = 'Lie — répartition';
     content.appendChild(h);
     content.appendChild(wrapScroll(globalLieTable));
   }
   if (globalShapeTable) {
     const h = document.createElement('h3');
-    h.textContent = 'Style de coup — répartition globale';
+    h.textContent = 'Style de coup — répartition';
     content.appendChild(h);
     content.appendChild(wrapScroll(globalShapeTable));
   }
 
+  // Le détail par club est redondant si un club précis est déjà sélectionné dans le
+  // filtre (les tables ci-dessus ne représentent alors déjà que ce club) : `clubs` est
+  // vide dans ce cas.
   clubs.forEach((club) => {
     const clubShots = shots.filter((s) => s.clubId === club.id);
     const lieTable = distributionTable(clubShots, 'lie', LIE_OPTIONS, 'Lie');
@@ -168,75 +169,31 @@ function buildLieShapeContent(shots, clubs) {
   return content;
 }
 
-function buildLieShapeSection(allRounds, clubs, courses) {
-  const shotItems = collectShotsWithRound(allRounds);
-  const hasAnyLieOrShape = shotItems.some((item) => item.shot.lie || item.shot.shape);
-  if (!hasAnyLieOrShape) return null;
+// hasAnyLieOrShapeEver : calculé sur l'ensemble des rounds (non filtré) — la section ne
+// s'affiche pas du tout tant que la fonctionnalité n'a jamais été utilisée, cohérent avec
+// la règle déjà en place "si un club n'a pas été renseigné, ne rien figurer". Une fois
+// affichée, elle reste visible même si les filtres courants ne matchent aucun coup (un
+// message l'indique alors, plutôt que de faire disparaître la section).
+function buildLieShapeSection(filteredRounds, clubs, clubFilterId, hasAnyLieOrShapeEver) {
+  if (!hasAnyLieOrShapeEver) return null;
+
+  let shots = collectShotsWithRound(filteredRounds).map((item) => item.shot);
+  if (clubFilterId) shots = shots.filter((s) => s.clubId === clubFilterId);
 
   const section = document.createElement('div');
   const title = document.createElement('h2');
   title.textContent = 'Analyse lie et style de coup';
   section.appendChild(title);
-
-  const filterForm = document.createElement('div');
-  filterForm.className = 'form';
-
-  const courseFilter = document.createElement('select');
-  const allCoursesOpt = document.createElement('option');
-  allCoursesOpt.value = '';
-  allCoursesOpt.textContent = 'Tous les golfs';
-  courseFilter.appendChild(allCoursesOpt);
-  courses.forEach((c) => {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name;
-    courseFilter.appendChild(opt);
-  });
-  filterForm.appendChild(createField('Filtrer par golf', courseFilter));
-
-  const yearFilter = document.createElement('input');
-  yearFilter.type = 'text';
-  yearFilter.placeholder = 'AA';
-  yearFilter.maxLength = 2;
-  filterForm.appendChild(createField('Filtrer par année (AA)', yearFilter));
-
-  const monthFilter = document.createElement('input');
-  monthFilter.type = 'text';
-  monthFilter.placeholder = 'MM';
-  monthFilter.maxLength = 2;
-  filterForm.appendChild(createField('Filtrer par mois (MM)', monthFilter));
-
-  section.appendChild(filterForm);
-
-  const content = document.createElement('div');
-  section.appendChild(content);
-
-  function refresh() {
-    const filters = {
-      courseId: courseFilter.value || null,
-      year: yearFilter.value.trim() || null,
-      month: monthFilter.value.trim() || null,
-    };
-    const filteredShots = shotItems.filter((item) => matchesFilters(item, filters)).map((item) => item.shot);
-    content.innerHTML = '';
-    content.appendChild(buildLieShapeContent(filteredShots, clubs));
-  }
-
-  courseFilter.addEventListener('change', refresh);
-  yearFilter.addEventListener('input', refresh);
-  monthFilter.addEventListener('input', refresh);
-  refresh();
-
+  section.appendChild(buildLieShapeContent(shots, clubFilterId ? [] : clubs));
   return section;
 }
 
-export async function renderStats(container) {
-  const [allRounds, clubs, courses, player] = await Promise.all([
-    getRounds(), getClubs(), getCourses(), getPlayer(),
-  ]);
-  const isSimplified = player?.appMode === 'simplified';
+// --- Rendu ---
 
-  const completedRounds = allRounds
+function renderFilteredContent(container, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver) {
+  const roundsMatchingFilters = allRounds.filter((r) => roundMatchesFilters(r, filters));
+
+  const completedRounds = roundsMatchingFilters
     .filter((r) => r.status === 'completed')
     .slice()
     .sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -244,7 +201,7 @@ export async function renderStats(container) {
   if (completedRounds.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'hint';
-    empty.textContent = 'Aucune partie terminée pour le moment.';
+    empty.textContent = 'Aucune partie terminée pour ces filtres.';
     container.appendChild(empty);
   } else {
     let totalPuttsAll = 0;
@@ -275,7 +232,7 @@ export async function renderStats(container) {
 
     const summary = document.createElement('p');
     summary.className = 'hint';
-    summary.textContent = `Moyenne de putts (toutes parties) : ${globalAvgPutts}`;
+    summary.textContent = `Moyenne de putts (parties filtrées) : ${globalAvgPutts}`;
     container.appendChild(summary);
 
     const puttsTitle = document.createElement('h2');
@@ -290,9 +247,30 @@ export async function renderStats(container) {
   }
 
   if (!isSimplified) {
-    container.appendChild(buildClubDistanceSection(computeClubDistanceStats(allRounds, clubs)));
-
-    const lieShapeSection = buildLieShapeSection(allRounds, clubs, courses);
+    container.appendChild(buildClubDistanceSection(computeClubDistanceStats(roundsMatchingFilters, clubs, filters.clubId)));
+    const lieShapeSection = buildLieShapeSection(roundsMatchingFilters, clubs, filters.clubId, hasAnyLieOrShapeEver);
     if (lieShapeSection) container.appendChild(lieShapeSection);
   }
+}
+
+export async function renderStats(container) {
+  const [allRounds, clubs, courses, player] = await Promise.all([
+    getRounds(), getClubs(), getCourses(), getPlayer(),
+  ]);
+  const isSimplified = player?.appMode === 'simplified';
+  const hasAnyLieOrShapeEver = collectShotsWithRound(allRounds).some((item) => item.shot.lie || item.shot.shape);
+
+  const filterBar = buildFilterBar({ courses, clubs: isSimplified ? null : clubs }, refresh);
+  container.appendChild(filterBar.element);
+
+  const content = document.createElement('div');
+  container.appendChild(content);
+
+  function refresh() {
+    const filters = filterBar.getFilters();
+    content.innerHTML = '';
+    renderFilteredContent(content, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver);
+  }
+
+  refresh();
 }

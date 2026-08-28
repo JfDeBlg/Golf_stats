@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.3** (voir `src/version.js`).
+Version actuelle : **1.2.4** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -81,6 +81,8 @@ src/
   ui/
     formHelpers.js             createField (champ label+input), createButtonGroup
                                 (sélection unique, ex: lie/style)
+    filters.js                   Barre de filtres partagée (Golf/Année/Mois + Club en
+                                  option) — Reprendre une partie, Historique, Statistiques
     icons.js                    Construit un <svg> DOM à partir du set d'icônes inline
     lineChart.js                Mini-graphique en ligne SVG (sans dépendance externe)
 
@@ -100,14 +102,17 @@ src/
     courseDelete.js                 Suppression d'un parcours
     courseCalibrate.js              Calibration GPS trou par trou + amorce OpenStreetMap
     courseFormShared.js             Formulaire de golf partagé (création/import/édition)
-    resumeRound.js                   Liste de rounds filtrable (en cours ou terminés)
+    resumeRound.js                   Liste de rounds filtrable (Golf/Année/Mois, en cours
+                                       ou terminés)
     roundNew.js                      Démarrage d'une partie (golf, départ, météo, GPS)
     play.js                           Écran de jeu : un trou à la fois, navigation
                                        circulaire, score/putts/coups, statut de trou
     scorecard.js                      Carte de score (lecture seule / mode édition)
-    history.js                        Historique des parties terminées
+    history.js                        Historique des parties terminées, filtrable
+                                       (Golf/Année/Mois)
     stats.js                          Statistiques (putts, stableford, distance par club,
-                                       analyse lie/style)
+                                       analyse lie/style), filtrables par Golf/Année/Mois,
+                                       + Club pour les sections club/coup
 ```
 
 ## Modèle de données (IndexedDB)
@@ -142,6 +147,7 @@ devient jamais `"calibrated"` de lui-même.
 | 1.2.1 | Carte de score : mode lecture seule / édition, colonne putts, largeur de colonnes ; mode Expert/Simplifié ; distinction `osm_prefilled`/`calibrated` ; recherche OSM par adresse ; lie/style de coup + statistiques associées |
 | 1.2.2 | Lignes de référence (objectif) statiques sur les graphiques Putting (2 putts/trou) et Score stableford (36 pts) |
 | 1.2.3 | Menu sandwich dans le bandeau (toujours visible, accès direct aux options du menu principal depuis n'importe quel écran) ; correctif d'un bug d'affichage `hidden` (le bouton retour et le menu déroulant restaient visibles malgré l'attribut `hidden`, une classe CSS avec `display` non conditionné écrasant la règle par défaut du navigateur) |
+| 1.2.4 | Filtre Club en Statistiques (barre de filtres partagée Golf/Année/Mois/Club, chaque section n'appliquant que les filtres qui la concernent) ; filtres Golf/Année/Mois ajoutés à l'Historique ; composant de filtre partagé (`src/ui/filters.js`) réutilisé aussi par Reprendre une partie |
 
 ## Tenir ce README à jour
 
