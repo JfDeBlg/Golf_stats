@@ -281,12 +281,12 @@ export async function renderStats(container) {
     const puttsTitle = document.createElement('h2');
     puttsTitle.textContent = 'Putting — moyenne par partie';
     container.appendChild(puttsTitle);
-    container.appendChild(buildLineChart(puttsPoints));
+    container.appendChild(buildLineChart(puttsPoints, { target: 2, targetLabel: 'Objectif : 2 putts/trou' }));
 
     const stablefordTitle = document.createElement('h2');
     stablefordTitle.textContent = 'Score stableford — ramené à 18 trous';
     container.appendChild(stablefordTitle);
-    container.appendChild(buildLineChart(stableford18Points));
+    container.appendChild(buildLineChart(stableford18Points, { target: 36, targetLabel: 'Objectif : 36 pts' }));
   }
 
   if (!isSimplified) {

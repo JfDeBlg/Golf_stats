@@ -2,7 +2,7 @@
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-export function buildLineChart(points, { width = 320, height = 180 } = {}) {
+export function buildLineChart(points, { width = 320, height = 180, target = null, targetLabel = '' } = {}) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('class', 'line-chart');
@@ -15,7 +15,7 @@ export function buildLineChart(points, { width = 320, height = 180 } = {}) {
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
 
-  const values = points.map((p) => p.value);
+  const values = target != null ? [...points.map((p) => p.value), target] : points.map((p) => p.value);
   const minValue = Math.min(...values, 0);
   const maxValue = Math.max(...values, 1);
   const range = maxValue - minValue || 1;
@@ -32,6 +32,29 @@ export function buildLineChart(points, { width = 320, height = 180 } = {}) {
   axis.setAttribute('y2', padding.top + plotHeight);
   axis.setAttribute('class', 'chart-axis');
   svg.appendChild(axis);
+
+  // Ligne de référence (objectif) : statique, purement visuelle — pas de champ de
+  // configuration pour l'instant.
+  if (target != null) {
+    const targetY = yFor(target);
+    const targetLine = document.createElementNS(SVG_NS, 'line');
+    targetLine.setAttribute('x1', padding.left);
+    targetLine.setAttribute('y1', targetY);
+    targetLine.setAttribute('x2', width - padding.right);
+    targetLine.setAttribute('y2', targetY);
+    targetLine.setAttribute('class', 'chart-target-line');
+    svg.appendChild(targetLine);
+
+    if (targetLabel) {
+      const targetText = document.createElementNS(SVG_NS, 'text');
+      targetText.setAttribute('x', width - padding.right);
+      targetText.setAttribute('y', targetY - 4);
+      targetText.setAttribute('text-anchor', 'end');
+      targetText.setAttribute('class', 'chart-target-label');
+      targetText.textContent = targetLabel;
+      svg.appendChild(targetText);
+    }
+  }
 
   const polyline = document.createElementNS(SVG_NS, 'polyline');
   polyline.setAttribute('points', points.map((p, i) => `${xFor(i)},${yFor(p.value)}`).join(' '));

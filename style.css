@@ -266,6 +266,15 @@ select {
   fill: var(--color-muted);
   font-size: 9px;
 }
+.chart-target-line {
+  stroke: #b45309;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.chart-target-label {
+  fill: #b45309;
+  font-size: 9px;
+}
 
 .list-select {
   display: flex;

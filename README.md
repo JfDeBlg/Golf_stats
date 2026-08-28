@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.1** (voir `src/version.js`).
+Version actuelle : **1.2.2** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -136,6 +136,7 @@ devient jamais `"calibrated"` de lui-même.
 | 1.1.2 | Export/import JSON complet, import de parcours depuis un PDF (pdf.js vendoré), correction de la logique "Reprendre une partie" (round unique/aucun/plusieurs), statistique distance moyenne par club |
 | 1.2.0 (Lot 2) | Calibration GPS trou par trou, amorce OpenStreetMap, géolocalisation du golf au lancement d'une partie, distance au drapeau, chaînage GPS des coups pleins |
 | 1.2.1 | Carte de score : mode lecture seule / édition, colonne putts, largeur de colonnes ; mode Expert/Simplifié ; distinction `osm_prefilled`/`calibrated` ; recherche OSM par adresse ; lie/style de coup + statistiques associées |
+| 1.2.2 | Lignes de référence (objectif) statiques sur les graphiques Putting (2 putts/trou) et Score stableford (36 pts) |
 
 ## Tenir ce README à jour
 
