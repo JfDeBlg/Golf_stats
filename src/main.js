@@ -2,7 +2,7 @@
 
 import { APP_VERSION } from './version.js';
 import { createIcon } from './ui/icons.js';
-import { renderMenu } from './views/menu.js';
+import { renderMenu, MENU_ITEMS, activateMenuItem } from './views/menu.js';
 import { renderSettings } from './views/settings.js';
 import { renderCourseManage } from './views/courseManage.js';
 import { renderCourseNew } from './views/courseNew.js';
@@ -39,6 +39,55 @@ const titleEl = document.getElementById('app-title');
 const backBtn = document.getElementById('btn-back');
 backBtn.appendChild(createIcon('arrowLeft', { size: 20 }));
 
+// Menu sandwich du bandeau : toujours visible, donne accès aux mêmes options que l'écran
+// Menu principal depuis n'importe quel autre écran.
+const menuBtn = document.getElementById('btn-menu');
+const menuDropdown = document.getElementById('menu-dropdown');
+menuBtn.appendChild(createIcon('menu', { size: 22 }));
+
+MENU_ITEMS.forEach((item) => {
+  const itemBtn = document.createElement('button');
+  itemBtn.type = 'button';
+  itemBtn.className = 'menu-dropdown-item';
+  itemBtn.textContent = item.label;
+  itemBtn.addEventListener('click', () => {
+    closeMenuDropdown();
+    activateMenuItem(item, navigate);
+  });
+  menuDropdown.appendChild(itemBtn);
+});
+
+function openMenuDropdown() {
+  menuDropdown.hidden = false;
+  menuBtn.setAttribute('aria-expanded', 'true');
+}
+
+function closeMenuDropdown() {
+  menuDropdown.hidden = true;
+  menuBtn.setAttribute('aria-expanded', 'false');
+}
+
+menuBtn.addEventListener('click', (event) => {
+  event.stopPropagation();
+  if (menuDropdown.hidden) {
+    openMenuDropdown();
+  } else {
+    closeMenuDropdown();
+  }
+});
+
+document.addEventListener('click', (event) => {
+  if (!menuDropdown.hidden && !menuDropdown.contains(event.target) && event.target !== menuBtn) {
+    closeMenuDropdown();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !menuDropdown.hidden) {
+    closeMenuDropdown();
+  }
+});
+
 const stack = [{ routeName: 'menu', params: {} }];
 
 export function navigate(routeName, params = {}, { replace = false } = {}) {
@@ -58,6 +107,7 @@ export function goBack() {
 }
 
 function renderCurrent() {
+  closeMenuDropdown();
   const { routeName, params } = stack[stack.length - 1];
   const route = routes[routeName];
   titleEl.textContent = route.title;

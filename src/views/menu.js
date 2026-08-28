@@ -1,8 +1,10 @@
-// Écran Menu principal.
+// Écran Menu principal. MENU_ITEMS et activateMenuItem sont exportés pour être réutilisés
+// par le menu sandwich du bandeau (src/main.js), qui donne accès aux mêmes options depuis
+// n'importe quel écran.
 
 import { getRounds } from '../db/repository.js';
 
-const MENU_ITEMS = [
+export const MENU_ITEMS = [
   { label: 'Réglages', route: 'settings' },
   { label: 'Reprendre une partie', route: 'resumeRound' },
   { label: 'Nouvelle partie', route: 'roundNew' },
@@ -26,6 +28,14 @@ async function handleResumeRound(navigate) {
   }
 }
 
+export async function activateMenuItem(item, navigate) {
+  if (item.route === 'resumeRound') {
+    await handleResumeRound(navigate);
+  } else {
+    navigate(item.route);
+  }
+}
+
 export function renderMenu(container, params, navigate) {
   const nav = document.createElement('nav');
   nav.className = 'menu-list';
@@ -35,13 +45,7 @@ export function renderMenu(container, params, navigate) {
     btn.type = 'button';
     btn.className = 'menu-item';
     btn.textContent = item.label;
-    btn.addEventListener('click', () => {
-      if (item.route === 'resumeRound') {
-        handleResumeRound(navigate);
-      } else {
-        navigate(item.route);
-      }
-    });
+    btn.addEventListener('click', () => activateMenuItem(item, navigate));
     nav.appendChild(btn);
   });
 

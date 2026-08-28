@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.2** (voir `src/version.js`).
+Version actuelle : **1.2.3** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -33,7 +33,8 @@ python -m http.server 8765
 ## Structure du projet
 
 ```
-index.html            Coquille de l'app (en-tête + point de montage des vues)
+index.html            Coquille de l'app (en-tête avec menu sandwich toujours visible +
+                        point de montage des vues)
 manifest.json          Manifeste PWA (icônes, nom, couleurs, mode standalone)
 service-worker.js      Cache-first des assets statiques ; CACHE_NAME versionné
 style.css               Feuille de style unique, thème clair/sombre automatique
@@ -41,7 +42,9 @@ style.css               Feuille de style unique, thème clair/sombre automatique
 icons/                  Icônes d'application (manifest, écran d'accueil)
 
 src/
-  main.js               Routeur (pile de vues, pas de framework) + enregistrement du SW
+  main.js               Routeur (pile de vues, pas de framework) + menu sandwich du
+                          bandeau (accès direct aux options du menu principal depuis
+                          n'importe quel écran) + enregistrement du SW
   version.js             Numéro de version affiché dans le menu — à garder sync avec
                           service-worker.js (CACHE_NAME)
 
@@ -86,7 +89,8 @@ src/
 
   views/                       Un module par écran ; chaque render(container, params,
                                 navigate) est appelé par le routeur dans src/main.js
-    menu.js                     Menu principal
+    menu.js                     Menu principal ; exporte aussi MENU_ITEMS/activateMenuItem,
+                                  réutilisés par le menu sandwich de src/main.js
     settings.js                  Réglages : profil (dont mode Expert/Simplifié), clubs,
                                   export/import, placeholders calibrés/cloud
     courseManage.js               Sous-menu Gestion parcours + liste des golfs enregistrés
@@ -137,6 +141,7 @@ devient jamais `"calibrated"` de lui-même.
 | 1.2.0 (Lot 2) | Calibration GPS trou par trou, amorce OpenStreetMap, géolocalisation du golf au lancement d'une partie, distance au drapeau, chaînage GPS des coups pleins |
 | 1.2.1 | Carte de score : mode lecture seule / édition, colonne putts, largeur de colonnes ; mode Expert/Simplifié ; distinction `osm_prefilled`/`calibrated` ; recherche OSM par adresse ; lie/style de coup + statistiques associées |
 | 1.2.2 | Lignes de référence (objectif) statiques sur les graphiques Putting (2 putts/trou) et Score stableford (36 pts) |
+| 1.2.3 | Menu sandwich dans le bandeau (toujours visible, accès direct aux options du menu principal depuis n'importe quel écran) ; correctif d'un bug d'affichage `hidden` (le bouton retour et le menu déroulant restaient visibles malgré l'attribut `hidden`, une classe CSS avec `display` non conditionné écrasant la règle par défaut du navigateur) |
 
 ## Tenir ce README à jour
 
