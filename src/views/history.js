@@ -6,6 +6,7 @@ import { getRounds, getCourses, deleteRound } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
 import { computeRoundSummary18 } from '../scoring/roundSummary.js';
+import { formatGolfName } from '../ui/formHelpers.js';
 
 export async function renderHistory(container, params, navigate) {
   const [allRounds, courses] = await Promise.all([getRounds(), getCourses()]);
@@ -43,7 +44,7 @@ export async function renderHistory(container, params, navigate) {
     const table = document.createElement('table');
     table.className = 'scorecard-table';
     const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Date</th><th>Golf</th><th>Score brut</th><th>Stableford net</th><th></th></tr>';
+    thead.innerHTML = '<tr><th>Date</th><th class="col-golf">Golf</th><th>Score<br>brut</th><th>Stableford<br>net</th><th></th></tr>';
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
 
@@ -55,7 +56,7 @@ export async function renderHistory(container, params, navigate) {
       row.addEventListener('click', () => navigate('scorecard', { roundId: round.id }));
       row.innerHTML = `
         <td>${round.date}</td>
-        <td>${course?.name ?? 'Golf supprimé'}</td>
+        <td class="col-golf">${course ? formatGolfName(course.name) : 'Golf supprimé'}</td>
         <td>${gross18 ?? '—'}</td>
         <td>${points18 ?? '—'}</td>
       `;

@@ -2,6 +2,7 @@
 
 import { getCourses, deleteCourse } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
+import { formatGolfName } from '../ui/formHelpers.js';
 
 export async function renderCourseDelete(container, params, navigate) {
   const courses = await getCourses();
@@ -23,16 +24,16 @@ export async function renderCourseDelete(container, params, navigate) {
 
     const label = document.createElement('span');
     label.className = 'list-item';
-    label.textContent = course.name;
+    label.textContent = formatGolfName(course.name);
     row.appendChild(label);
 
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn-icon';
-    deleteBtn.setAttribute('aria-label', `Supprimer ${course.name}`);
+    deleteBtn.setAttribute('aria-label', `Supprimer ${formatGolfName(course.name)}`);
     deleteBtn.appendChild(createIcon('delete', { size: 18 }));
     deleteBtn.addEventListener('click', () => {
-      if (confirm(`Supprimer définitivement le golf "${course.name}" ?`)) {
+      if (confirm(`Supprimer définitivement le golf "${formatGolfName(course.name)}" ?`)) {
         deleteCourse(course.id).then(() => navigate('courseDelete', {}, { replace: true }));
       }
     });

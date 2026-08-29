@@ -1,18 +1,23 @@
 // Écran Gestion parcours : sous-menu regroupant les 3 actions sur les golfs, plus un
 // raccourci direct vers chaque golf déjà enregistré (édition ou suppression en un clic).
 // La liste est triée par ordre alphabétique insensible à la casse ; le nom est affiché en
-// casse phrase (transformation d'affichage uniquement, la donnée stockée n'est pas modifiée).
+// casse phrase via formatGolfName (src/ui/formHelpers.js), partagée avec tous les autres
+// écrans qui affichent ou proposent un nom de golf — transformation d'affichage uniquement,
+// la donnée stockée n'est jamais modifiée.
 
 import { getCourses, deleteCourse } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
+import { formatGolfName } from '../ui/formHelpers.js';
+
+const ITEM_ICON_SIZE = 20;
 
 const ITEMS = [
-  { label: 'Nouveau parcours', route: 'courseNew' },
-  { label: 'Importer depuis un PDF', route: 'courseImportPdf' },
-  { label: 'Calibrer avec le GPS', route: 'courseCalibrate' },
-  { label: 'Modifier parcours', route: 'courseEdit' },
-  { label: 'Supprimer parcours', route: 'courseDelete' },
+  { label: 'Nouveau parcours', route: 'courseNew', icon: 'add' },
+  { label: 'Importer depuis un PDF', route: 'courseImportPdf', icon: 'document' },
+  { label: 'Calibrer avec le GPS', route: 'courseCalibrate', icon: 'satellite', iconSize: ITEM_ICON_SIZE + 4 },
+  { label: 'Modifier parcours', route: 'courseEdit', icon: 'edit' },
+  { label: 'Supprimer parcours', route: 'courseDelete', icon: 'delete' },
 ];
 
 const MANAGE_HELP_TEXT = [
@@ -20,11 +25,6 @@ const MANAGE_HELP_TEXT = [
   "Une icône satellite signifie que des repères ont été préremplis automatiquement via OpenStreetMap, mais pas encore validés sur le terrain.",
   "Aucune icône : le parcours n'a pas encore été calibré (saisie manuelle ou import PDF uniquement).",
 ];
-
-function toSentenceCase(name) {
-  if (!name) return name;
-  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-}
 
 export async function renderCourseManage(container, params, navigate) {
   const headerRow = document.createElement('div');
@@ -39,7 +39,8 @@ export async function renderCourseManage(container, params, navigate) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'menu-item';
-    btn.textContent = item.label;
+    btn.appendChild(createIcon(item.icon, { size: item.iconSize ?? ITEM_ICON_SIZE }));
+    btn.appendChild(document.createTextNode(item.label));
     btn.addEventListener('click', () => navigate(item.route));
     nav.appendChild(btn);
   });
@@ -74,7 +75,7 @@ export async function renderCourseManage(container, params, navigate) {
       nameBtn.type = 'button';
       nameBtn.className = 'list-item course-name-item';
       nameBtn.appendChild(createIcon('edit', { size: 16 }));
-      nameBtn.appendChild(document.createTextNode(toSentenceCase(course.name)));
+      nameBtn.appendChild(document.createTextNode(formatGolfName(course.name)));
       if (course.source === 'calibrated') {
         nameBtn.appendChild(createIcon('check', { size: 16 }));
       } else if (course.source === 'osm_prefilled') {
@@ -86,10 +87,10 @@ export async function renderCourseManage(container, params, navigate) {
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'btn-icon';
-      deleteBtn.setAttribute('aria-label', `Supprimer ${course.name}`);
+      deleteBtn.setAttribute('aria-label', `Supprimer ${formatGolfName(course.name)}`);
       deleteBtn.appendChild(createIcon('delete', { size: 18 }));
       deleteBtn.addEventListener('click', async () => {
-        if (confirm(`Supprimer définitivement le golf "${course.name}" ?`)) {
+        if (confirm(`Supprimer définitivement le golf "${formatGolfName(course.name)}" ?`)) {
           await deleteCourse(course.id);
           await refresh();
         }

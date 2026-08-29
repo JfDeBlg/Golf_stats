@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.5** (voir `src/version.js`).
+Version actuelle : **1.2.51** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -54,9 +54,10 @@ src/
     repository.js        CRUD unique vers IndexedDB — seul point d'accès aux données
     exportImport.js       Sérialisation/désérialisation complète : export JSON zippé
                           (JSZip vendoré) partagé via la feuille de partage native
-                          (Web Share API, repli sur téléchargement direct si indisponible) ;
-                          import acceptant .json ou .zip, avec remplacement total des
-                          données après confirmation
+                          (Web Share API, repli sur téléchargement direct si indisponible),
+                          ou téléchargé directement (downloadZipFile, sans jamais passer par
+                          la feuille de partage) ; import acceptant .json ou .zip, avec
+                          remplacement total des données après confirmation
 
   scoring/                Fonctions de calcul pures (aucun accès DOM), testables isolément
     handicap.js            Course Handicap, coups rendus par trou
@@ -93,9 +94,15 @@ src/
 
   ui/
     formHelpers.js             createField (champ label+input), createButtonGroup
-                                (sélection unique, ex: lie/style)
+                                (sélection unique, ex: lie/style), formatGolfName (casse
+                                d'affichage uniforme d'un nom de golf, jamais appliquée aux
+                                noms d'origine externe déjà correctement casés comme les
+                                résultats OpenStreetMap)
     filters.js                   Barre de filtres partagée (Golf/Année/Mois + Club en
-                                  option) — Reprendre une partie, Historique, Statistiques
+                                  option) — Reprendre une partie, Historique, Statistiques ;
+                                  le champ Club, quand demandé, est renvoyé séparément
+                                  (`clubFilterElement`) pour que l'appelant puisse le
+                                  positionner ailleurs dans l'écran (cf. Statistiques)
     icons.js                    Construit un <svg> DOM à partir du set d'icônes inline
     lineChart.js                Mini-graphique en ligne SVG (sans dépendance externe)
     helpOverlay.js               createHelpButton(texte) : bouton "?" réutilisable ouvrant
@@ -114,13 +121,15 @@ src/
                                   MENU_ITEMS/activateMenuItem, réutilisés par le menu
                                   sandwich de src/main.js pour garder un seul ordre partout
     settings.js                  Réglages : profil (dont mode Expert/Simplifié), clubs,
-                                  section unique "Sauvegarde / Partage" (export ZIP + partage
-                                  natif, import .json ou .zip) — pas de liste de golfs ici
-                                  (voir Gestion parcours)
-    courseManage.js               Sous-menu Gestion parcours + liste des golfs enregistrés,
-                                   triée alphabétiquement (insensible à la casse), noms
-                                   affichés en casse phrase (affichage seulement), bouton
-                                   d'aide expliquant les icônes de statut de calibration
+                                  section unique "Sauvegarde / Partage" (Exporter et
+                                  partager / Télécharger en ZIP / Importer .json ou .zip) —
+                                  pas de liste de golfs ici (voir Gestion parcours)
+    courseManage.js               Sous-menu Gestion parcours (icônes, dont une icône
+                                   satellite agrandie pour Calibrer avec le GPS) + liste des
+                                   golfs enregistrés, triée alphabétiquement (insensible à la
+                                   casse), noms affichés en casse phrase (formatGolfName),
+                                   bouton d'aide expliquant les icônes de statut de
+                                   calibration
     courseNew.js                   Création manuelle d'un parcours
     courseImportPdf.js             Import PDF -> pré-remplissage du formulaire de création ;
                                     bouton d'aide + lien vers le générateur de carte de score
@@ -131,11 +140,17 @@ src/
                                     OpenStreetMap par lieu approximatif OU par lien
                                     OpenStreetMap direct (.../way/<id>), chacun avec sa
                                     propre gestion d'erreur indépendante
-    courseFormShared.js             Formulaire de golf partagé (création/import/édition)
+    courseFormShared.js             Formulaire de golf partagé (création/import/édition) :
+                                    pas de champ Lieu (localisation issue uniquement de la
+                                    calibration GPS/OSM), couleur de départ en liste
+                                    déroulante (7 couleurs standard), colonne "Handicap" par
+                                    trou (ex-"Index (SI)"), bouton d'aide (Slope/SSS/Handicap)
     resumeRound.js                   Tableau de rounds filtrable (Golf/Année/Mois) : Date /
-                                       Golf / Score brut / Stableford net, les deux derniers
-                                       ramenés à 18 trous par règle de trois (un tiret
-                                       uniquement si aucun trou n'a de score)
+                                       Golf / Score brut / Stableford net (en-têtes Score/
+                                       Stableford sur 2 lignes pour laisser plus de place à
+                                       la colonne Golf), les deux derniers ramenés à 18 trous
+                                       par règle de trois (un tiret uniquement si aucun trou
+                                       n'a de score)
     roundNew.js                      Démarrage d'une partie (golf, départ, météo, GPS) ;
                                        bouton d'aide
     play.js                           Écran de jeu : un trou à la fois, navigation
@@ -145,8 +160,10 @@ src/
                                        normalisation à 18 trous que Reprendre une partie,
                                        filtrable (Golf/Année/Mois)
     stats.js                          Statistiques (putts, stableford, distance par club,
-                                       analyse lie/style), filtrables par Golf/Année/Mois,
-                                       + Club pour les sections club/coup ; bouton d'aide
+                                       analyse lie/style) ; filtres Golf/Année/Mois en haut
+                                       (s'appliquent à tout), filtre Club positionné sous les
+                                       deux graphiques, juste au-dessus des sections qu'il
+                                       affecte réellement ; bouton d'aide
 ```
 
 ## Modèle de données (IndexedDB)
@@ -169,6 +186,11 @@ src/
 qui complète les 18 trous ; un préremplissage OpenStreetMap marque `"osm_prefilled"` et ne
 devient jamais `"calibrated"` de lui-même.
 
+`Course.location` n'a plus de champ de saisie manuelle dans le formulaire de golf depuis la
+1.2.51 (la localisation vient désormais uniquement de la calibration GPS/OpenStreetMap) ;
+le champ reste dans le modèle de données pour compatibilité et sert encore de préremplissage
+optionnel du champ de recherche OSM en calibration quand il est déjà renseigné.
+
 ## Historique des versions
 
 | Version | Contenu |
@@ -183,6 +205,7 @@ devient jamais `"calibrated"` de lui-même.
 | 1.2.3 | Menu sandwich dans le bandeau (toujours visible, accès direct aux options du menu principal depuis n'importe quel écran) ; correctif d'un bug d'affichage `hidden` (le bouton retour et le menu déroulant restaient visibles malgré l'attribut `hidden`, une classe CSS avec `display` non conditionné écrasant la règle par défaut du navigateur) |
 | 1.2.4 | Filtre Club en Statistiques (barre de filtres partagée Golf/Année/Mois/Club, chaque section n'appliquant que les filtres qui la concernent) ; filtres Golf/Année/Mois ajoutés à l'Historique ; composant de filtre partagé (`src/ui/filters.js`) réutilisé aussi par Reprendre une partie |
 | 1.2.5 | Renommage de l'app en **GolfStats** ; aide contextuelle (bouton "?" + bulle, `src/ui/helpOverlay.js`) sur Import PDF, Calibration GPS, Gestion parcours, Nouvelle partie, Statistiques ; calibration GPS enrichie d'un second mode de préremplissage par lien OpenStreetMap direct (`.../way/<id>`) en plus de la recherche par lieu approximatif ; menu principal et menu sandwich réordonnés avec icônes (source unique `MENU_ITEMS`) ; suppression de la liste "Golfs calibrés" dans Réglages (doublon de Gestion parcours) ; remplacement de l'ébauche de sauvegarde cloud par un export ZIP (JSZip vendoré) + partage natif (Web Share API), import acceptant .json ou .zip ; tableaux Date/Golf/Score brut/Stableford net (ramenés à 18 trous par règle de trois) sur Reprendre une partie et Historique ; Gestion parcours : tri alphabétique insensible à la casse, affichage en casse phrase, police réduite ; **correctif critique** : import statique de pdf.js dans le graphe de modules de `main.js` pouvant faire échouer le chargement de toute l'app sur certains moteurs iOS (écran blanc, seul le bandeau visible) — converti en `import()` paresseux déclenché à l'usage, plus un filet de sécurité (message d'erreur si `#app` reste vide après 4s) ; règle CSS globale `[hidden] { display: none !important; }` pour garantir définitivement la priorité de l'attribut `hidden` sur toute classe fixant `display` |
+| 1.2.51 | Reprendre une partie et Historique : en-têtes "Score brut"/"Stableford net" sur 2 lignes pour élargir la colonne Golf ; Statistiques : filtre Club déplacé sous les deux graphiques, juste au-dessus des sections qu'il affecte (`filterBar.clubFilterElement` retourné séparément par `src/ui/filters.js`) ; casse d'affichage des noms de golf harmonisée partout via une fonction unique (`formatGolfName`, `src/ui/formHelpers.js`) au lieu d'être limitée à Gestion parcours ; formulaire de golf (Nouveau parcours/Modifier parcours/Import PDF) : suppression du champ Lieu (localisation désormais uniquement via calibration GPS/OSM), "Couleur de départ jouée" en liste déroulante (Noir/Blanc/Jaune/Bleu/Rouge/Orange/Violet), colonne par-trou renommée "Index (SI)" -> "Handicap", bouton d'aide expliquant Slope/SSS/Handicap ; icône satellite agrandie pour "Calibrer avec le GPS" dans Gestion parcours ; Réglages : bouton "Télécharger (ZIP)" ajouté à côté de "Exporter et partager" pour un téléchargement direct sans passer par la feuille de partage (utile sur ordinateur) |
 
 ## Tenir ce README à jour
 

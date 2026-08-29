@@ -1,7 +1,9 @@
 // Écran Statistiques : moyenne de putts globale, deux graphiques (putting, score
 // stableford ramené à 18 trous), un tableau de distance moyenne par club, et une analyse
-// lie/style de coup. Un seul jeu de filtres (Golf, Année, Mois, Club) en haut de l'écran ;
-// chaque section n'applique que les filtres qui la concernent :
+// lie/style de coup. Filtres Golf/Année/Mois en haut de l'écran (s'appliquent à tout) ;
+// le filtre Club est positionné plus bas, juste au-dessus des deux seules sections qu'il
+// affecte réellement (`filterBar.clubFilterElement`, retourné séparément par
+// `src/ui/filters.js` pour ne pas être rendu avec le reste de la barre de filtres) :
 //   - Moyenne de putts + graphiques : Golf/Année/Mois uniquement (le filtre Club n'a pas de
 //     sens à l'échelle d'un round entier ; les lignes objectif restent affichées quel que
 //     soit le filtre).
@@ -197,7 +199,7 @@ function buildLieShapeSection(filteredRounds, clubs, clubFilterId, hasAnyLieOrSh
 
 // --- Rendu ---
 
-function renderFilteredContent(container, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver) {
+function renderFilteredContent(container, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver, clubFilterElement) {
   const roundsMatchingFilters = allRounds.filter((r) => roundMatchesFilters(r, filters));
 
   const completedRounds = roundsMatchingFilters
@@ -254,6 +256,7 @@ function renderFilteredContent(container, allRounds, clubs, isSimplified, filter
   }
 
   if (!isSimplified) {
+    if (clubFilterElement) container.appendChild(clubFilterElement);
     container.appendChild(buildClubDistanceSection(computeClubDistanceStats(roundsMatchingFilters, clubs, filters.clubId)));
     const lieShapeSection = buildLieShapeSection(roundsMatchingFilters, clubs, filters.clubId, hasAnyLieOrShapeEver);
     if (lieShapeSection) container.appendChild(lieShapeSection);
@@ -281,7 +284,7 @@ export async function renderStats(container) {
   function refresh() {
     const filters = filterBar.getFilters();
     content.innerHTML = '';
-    renderFilteredContent(content, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver);
+    renderFilteredContent(content, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver, filterBar.clubFilterElement);
   }
 
   refresh();

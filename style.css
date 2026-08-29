@@ -313,6 +313,11 @@ select {
   font-weight: bold;
   background: #f0f0ea;
 }
+.scorecard-table th.col-golf,
+.scorecard-table td.col-golf {
+  width: auto;
+  white-space: normal;
+}
 .scorecard-table tbody tr.clickable {
   cursor: pointer;
 }

@@ -91,7 +91,6 @@ export async function renderCourseImportPdf(container, params, navigate) {
 
     const pseudoInitialCourse = {
       name: parsed.name,
-      location: '',
       recommendedTees: [parsed.tee],
       holes: parsed.holes.map((h) => ({
         number: h.number,

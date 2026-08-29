@@ -1,10 +1,15 @@
 // Barre de filtres réutilisable (Golf / Année / Mois, + Club en option) — partagée par
 // Reprendre une partie, Historique et Statistiques pour éviter toute réimplémentation.
 
-import { createField } from './formHelpers.js';
+import { createField, formatGolfName } from './formHelpers.js';
 
 // options: { courses: [...], clubs: [...] | null } — clubs=null n'affiche pas ce filtre
 // (Historique et Reprendre une partie n'ont pas de notion de club).
+//
+// Le champ Club, quand demandé, n'est PAS ajouté à `element` : il est renvoyé séparément
+// via `clubFilterElement` pour que l'appelant (Statistiques) puisse le positionner ailleurs
+// dans l'écran (sous les graphiques, juste au-dessus des sections qu'il affecte), tout en
+// restant piloté par le même onChange/getFilters.
 export function buildFilterBar(options, onChange) {
   const { courses = [], clubs = null } = options;
   const form = document.createElement('div');
@@ -18,7 +23,7 @@ export function buildFilterBar(options, onChange) {
   courses.forEach((c) => {
     const opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = c.name;
+    opt.textContent = formatGolfName(c.name);
     courseFilter.appendChild(opt);
   });
   form.appendChild(createField('Filtrer par golf', courseFilter));
@@ -36,6 +41,7 @@ export function buildFilterBar(options, onChange) {
   form.appendChild(createField('Filtrer par mois (MM)', monthFilter));
 
   let clubFilter = null;
+  let clubFilterElement = null;
   if (clubs) {
     clubFilter = document.createElement('select');
     const allClubsOpt = document.createElement('option');
@@ -48,7 +54,7 @@ export function buildFilterBar(options, onChange) {
       opt.textContent = c.name;
       clubFilter.appendChild(opt);
     });
-    form.appendChild(createField('Filtrer par club', clubFilter));
+    clubFilterElement = createField('Filtrer par club', clubFilter);
   }
 
   function getFilters() {
@@ -69,7 +75,7 @@ export function buildFilterBar(options, onChange) {
   monthFilter.addEventListener('input', emit);
   if (clubFilter) clubFilter.addEventListener('change', emit);
 
-  return { element: form, getFilters };
+  return { element: form, getFilters, clubFilterElement };
 }
 
 // Un round correspond aux filtres Golf/Année/Mois. Le filtre Club (s'il existe) reste à la

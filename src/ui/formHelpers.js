@@ -1,5 +1,14 @@
 // Petits utilitaires DOM partagés entre les vues de formulaire.
 
+// Casse d'affichage uniforme pour un nom de golf saisi par l'utilisateur (première lettre
+// en majuscule, reste en minuscules) — jamais appliquée aux données elles-mêmes (affichage
+// seulement), ni aux noms provenant d'une source externe déjà correctement casée (résultats
+// OpenStreetMap).
+export function formatGolfName(name) {
+  if (!name) return name;
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
 let fieldCounter = 0;
 
 export function createField(labelText, inputEl) {

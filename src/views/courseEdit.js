@@ -8,6 +8,7 @@
 import { getCourses, saveCourse } from '../db/repository.js';
 import { buildCourseForm } from './courseFormShared.js';
 import { deriveCourseSource } from '../scoring/calibration.js';
+import { formatGolfName } from '../ui/formHelpers.js';
 
 function mergeTees(existingTees, newTee) {
   const tees = [...(existingTees ?? [])];
@@ -38,7 +39,7 @@ export async function renderCourseEdit(container, params, navigate) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'list-item';
-      btn.textContent = course.name;
+      btn.textContent = formatGolfName(course.name);
       btn.addEventListener('click', () => navigate('courseEdit', { courseId: course.id }, { replace: true }));
       list.appendChild(btn);
     });
@@ -84,7 +85,6 @@ export async function renderCourseEdit(container, params, navigate) {
       const updatedCourse = {
         ...course,
         name: data.name,
-        location: data.location,
         recommendedTees: mergeTees(course.recommendedTees, data.tee),
         holes,
       };

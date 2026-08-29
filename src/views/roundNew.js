@@ -6,7 +6,7 @@ import { computeCourseHandicap } from '../scoring/handicap.js';
 import { haversineDistance } from '../scoring/distance.js';
 import { computeCourseReferencePoint } from '../scoring/calibration.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
-import { createField } from '../ui/formHelpers.js';
+import { createField, formatGolfName } from '../ui/formHelpers.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
 
 const WIND_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
@@ -52,7 +52,7 @@ export async function renderRoundNew(container, params, navigate) {
   courses.forEach((c) => {
     const opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = c.name;
+    opt.textContent = formatGolfName(c.name);
     courseSelect.appendChild(opt);
   });
   form.appendChild(createField('Golf (sélection manuelle toujours disponible)', courseSelect));
@@ -163,7 +163,7 @@ export async function renderRoundNew(container, params, navigate) {
         courseSelect.value = nearest.id;
         refreshTees();
         locateStatus.className = 'status-msg';
-        locateStatus.textContent = `Golf trouvé : ${nearest.name} (à ${Math.round(nearestDist)} m).`;
+        locateStatus.textContent = `Golf trouvé : ${formatGolfName(nearest.name)} (à ${Math.round(nearestDist)} m).`;
       } else {
         locateStatus.textContent = 'Aucun golf calibré à proximité — sélectionnez-le manuellement.';
       }

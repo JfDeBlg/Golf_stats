@@ -27,21 +27,6 @@ export async function buildExportData() {
   };
 }
 
-export function downloadExport(exportData) {
-  const json = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const dateStamp = exportData.exportedAt.slice(0, 10).replace(/-/g, '');
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `golf-app-export-${dateStamp}.json`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
-
 // Valide la structure d'un fichier d'export avant toute écriture en base — un fichier
 // invalide ou d'une version incompatible ne doit modifier aucune donnée existante.
 export function validateExportData(raw) {
@@ -105,6 +90,17 @@ export async function buildExportZipFile(exportData) {
   return new File([blob], `golf-app-export-${dateStamp}.zip`, { type: 'application/zip' });
 }
 
+function triggerFileDownload(file) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.name;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // Partage natif (feuille de partage iOS : Mail, Messages, Fichiers/iCloud Drive, AirDrop…)
 // quand disponible ; repli sur le téléchargement direct sinon. Aucune connexion réseau
 // nécessaire à aucune étape — seule l'application de destination choisie par l'utilisateur
@@ -114,15 +110,15 @@ export async function shareOrDownloadZip(zipFile) {
     await navigator.share({ files: [zipFile], title: zipFile.name });
     return 'shared';
   }
-  const url = URL.createObjectURL(zipFile);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = zipFile.name;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  triggerFileDownload(zipFile);
   return 'downloaded';
+}
+
+// Téléchargement direct, sans jamais passer par la feuille de partage — pour un
+// comportement prévisible quel que soit l'appareil (utile notamment sur ordinateur, où la
+// feuille de partage iOS n'a pas de sens).
+export function downloadZipFile(zipFile) {
+  triggerFileDownload(zipFile);
 }
 
 // Import : accepte un .json (chemin existant) ou un .zip (décompressé via JSZip), puis

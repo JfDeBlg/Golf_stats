@@ -10,6 +10,7 @@
 
 import { getRound, getCourse, getPlayer, saveRound } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
+import { formatGolfName } from '../ui/formHelpers.js';
 
 export async function renderScorecard(container, params, navigate) {
   const round = await getRound(params.roundId);
@@ -21,7 +22,7 @@ export async function renderScorecard(container, params, navigate) {
   const info = document.createElement('p');
   info.className = 'hint';
   const statusLabel = round.status === 'completed' ? 'Terminée' : 'En cours';
-  info.textContent = `${course.name} — ${round.date} — Départ ${round.teeColor} — Course Handicap ${round.courseHandicap} — ${statusLabel}`;
+  info.textContent = `${formatGolfName(course.name)} — ${round.date} — Départ ${round.teeColor} — Course Handicap ${round.courseHandicap} — ${statusLabel}`;
   container.appendChild(info);
 
   if (!editMode) {

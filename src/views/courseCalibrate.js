@@ -15,7 +15,7 @@ import {
 } from '../geo/openStreetMap.js';
 import { deriveCourseSource, isCourseFullyCalibrated } from '../scoring/calibration.js';
 import { createIcon } from '../ui/icons.js';
-import { createField } from '../ui/formHelpers.js';
+import { createField, formatGolfName } from '../ui/formHelpers.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
 
 const CALIBRATE_HELP_TEXT = [
@@ -59,7 +59,7 @@ export async function renderCourseCalibrate(container, params, navigate) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'list-item';
-      btn.textContent = course.name;
+      btn.textContent = formatGolfName(course.name);
       btn.addEventListener('click', () => navigate('courseCalibrate', { courseId: course.id, holeNumber: 1 }, { replace: true }));
       list.appendChild(btn);
     });
@@ -131,7 +131,7 @@ export async function renderCourseCalibrate(container, params, navigate) {
   const osmInput = document.createElement('input');
   osmInput.type = 'text';
   osmInput.placeholder = 'Ville, nom du golf, ou "lat,lng"';
-  osmInput.value = course.location || course.name || '';
+  osmInput.value = course.location || formatGolfName(course.name) || '';
   osmForm.appendChild(createField('Lieu approximatif', osmInput));
 
   const osmBtn = document.createElement('button');

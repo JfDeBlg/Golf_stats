@@ -4,7 +4,7 @@
 
 import { getPlayer, savePlayer, getClubs, saveClub, deleteClub } from '../db/repository.js';
 import {
-  buildExportData, buildExportZipFile, shareOrDownloadZip, readExportFile, importExportData,
+  buildExportData, buildExportZipFile, shareOrDownloadZip, downloadZipFile, readExportFile, importExportData,
 } from '../db/exportImport.js';
 import { createField } from '../ui/formHelpers.js';
 import { createIcon } from '../ui/icons.js';
@@ -274,6 +274,12 @@ function buildBackupSection() {
   shareBtn.textContent = 'Exporter et partager';
   section.appendChild(shareBtn);
 
+  const downloadBtn = document.createElement('button');
+  downloadBtn.type = 'button';
+  downloadBtn.className = 'btn-secondary';
+  downloadBtn.textContent = 'Télécharger (ZIP)';
+  section.appendChild(downloadBtn);
+
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
   importBtn.className = 'btn-secondary';
@@ -305,6 +311,24 @@ function buildBackupSection() {
       statusEl.textContent = `Export impossible : ${err.message}`;
     } finally {
       shareBtn.disabled = false;
+    }
+  });
+
+  downloadBtn.addEventListener('click', async () => {
+    statusEl.className = 'hint';
+    statusEl.textContent = "Préparation de l'export…";
+    downloadBtn.disabled = true;
+    try {
+      const exportData = await buildExportData();
+      const zipFile = await buildExportZipFile(exportData);
+      downloadZipFile(zipFile);
+      statusEl.className = 'status-msg';
+      statusEl.textContent = 'Fichier ZIP téléchargé.';
+    } catch (err) {
+      statusEl.className = 'error-msg';
+      statusEl.textContent = `Export impossible : ${err.message}`;
+    } finally {
+      downloadBtn.disabled = false;
     }
   });
 

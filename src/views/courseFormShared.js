@@ -8,6 +8,15 @@
 import { computeCourseHandicap } from '../scoring/handicap.js';
 import { getPlayer, getCourses, saveCourse } from '../db/repository.js';
 import { createField } from '../ui/formHelpers.js';
+import { createHelpButton } from '../ui/helpOverlay.js';
+
+const TEE_COLORS = ['Noir', 'Blanc', 'Jaune', 'Bleu', 'Rouge', 'Orange', 'Violet'];
+
+const COURSE_FORM_HELP_TEXT = [
+  'Slope : indicateur de difficulté du parcours pour un joueur moyen par rapport à un joueur scratch, utilisé dans le calcul du Course Handicap.',
+  "SSS (Scratch Score Standard) : le score qu'un joueur scratch est censé réaliser sur ce parcours, également utilisé dans le calcul du Course Handicap.",
+  'Handicap (par trou) : classement des trous par difficulté croissante.',
+];
 
 export async function buildCourseForm(initialCourse = null) {
   const [player, existingCourses] = await Promise.all([getPlayer(), getCourses()]);
@@ -15,6 +24,11 @@ export async function buildCourseForm(initialCourse = null) {
 
   const form = document.createElement('form');
   form.className = 'form course-form';
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row';
+  headerRow.appendChild(createHelpButton(COURSE_FORM_HELP_TEXT));
+  form.appendChild(headerRow);
 
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
@@ -32,18 +46,24 @@ export async function buildCourseForm(initialCourse = null) {
   });
   form.appendChild(datalist);
 
-  const locationInput = document.createElement('input');
-  locationInput.type = 'text';
-  locationInput.value = initialCourse?.location ?? '';
-  form.appendChild(createField('Lieu (optionnel)', locationInput));
-
   const existingTee = initialCourse?.recommendedTees?.[0];
 
-  const teeColorInput = document.createElement('input');
-  teeColorInput.type = 'text';
-  teeColorInput.value = existingTee?.color ?? '';
-  teeColorInput.required = true;
-  form.appendChild(createField('Couleur de départ jouée', teeColorInput));
+  const teeColorSelect = document.createElement('select');
+  const existingColor = existingTee?.color ?? '';
+  if (existingColor && !TEE_COLORS.includes(existingColor)) {
+    const legacyOpt = document.createElement('option');
+    legacyOpt.value = existingColor;
+    legacyOpt.textContent = existingColor;
+    teeColorSelect.appendChild(legacyOpt);
+  }
+  TEE_COLORS.forEach((color) => {
+    const opt = document.createElement('option');
+    opt.value = color;
+    opt.textContent = color;
+    teeColorSelect.appendChild(opt);
+  });
+  teeColorSelect.value = existingColor || TEE_COLORS[1];
+  form.appendChild(createField('Couleur de départ jouée', teeColorSelect));
 
   const slopeInput = document.createElement('input');
   slopeInput.type = 'number';
@@ -69,7 +89,7 @@ export async function buildCourseForm(initialCourse = null) {
   const table = document.createElement('table');
   table.className = 'holes-table';
   const thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>Trou</th><th>Par</th><th>Index (SI)</th><th>Distance (m)</th></tr>';
+  thead.innerHTML = '<tr><th>Trou</th><th>Par</th><th>Handicap</th><th>Distance (m)</th></tr>';
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
   table.appendChild(tbody);
@@ -141,14 +161,13 @@ export async function buildCourseForm(initialCourse = null) {
   function getData() {
     const strokeIndexes = holeInputs.map((h) => parseInt(h.siInput.value, 10));
     if (new Set(strokeIndexes).size !== 18) {
-      throw new Error('Les index de trou (SI) doivent être uniques, de 1 à 18.');
+      throw new Error('Les handicaps de trou doivent être uniques, de 1 à 18.');
     }
 
     return {
       name: nameInput.value.trim(),
-      location: locationInput.value.trim(),
       tee: {
-        color: teeColorInput.value.trim(),
+        color: teeColorSelect.value,
         slope: parseFloat(slopeInput.value),
         sss: parseFloat(sssInput.value),
       },
@@ -179,7 +198,7 @@ export async function saveNewCourseFromFormData(data, source) {
   }));
   return saveCourse({
     name: data.name,
-    location: data.location,
+    location: '',
     source,
     recommendedTees: [data.tee],
     holes,
