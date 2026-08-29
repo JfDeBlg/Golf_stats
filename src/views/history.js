@@ -1,11 +1,11 @@
 // Écran Historique : tableau des parties terminées, filtrable (Golf/Année/Mois). Mêmes
 // colonnes et même normalisation à 18 trous que Reprendre une partie (cf.
-// src/scoring/roundSummary.js) : Date / Golf / Score brut / Stableford net.
+// src/scoring/roundSummary.js) : Date / Golf / Écart / Stableford net.
 
 import { getRounds, getCourses, deleteRound } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
-import { computeRoundSummary18 } from '../scoring/roundSummary.js';
+import { computeRoundSummary18, formatToPar } from '../scoring/roundSummary.js';
 import { formatGolfName } from '../ui/formHelpers.js';
 
 export async function renderHistory(container, params, navigate) {
@@ -44,20 +44,20 @@ export async function renderHistory(container, params, navigate) {
     const table = document.createElement('table');
     table.className = 'scorecard-table';
     const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Date</th><th class="col-golf">Golf</th><th>Score<br>brut</th><th>Stableford<br>net</th><th></th></tr>';
+    thead.innerHTML = '<tr><th>Date</th><th class="col-golf">Golf</th><th>Écart</th><th>Stableford<br>net</th><th></th></tr>';
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
 
     filtered.forEach((round) => {
       const course = courseById.get(round.courseId);
-      const { gross18, points18 } = computeRoundSummary18(round);
+      const { toPar18, points18 } = computeRoundSummary18(round, course);
       const row = document.createElement('tr');
       row.className = 'clickable';
       row.addEventListener('click', () => navigate('scorecard', { roundId: round.id }));
       row.innerHTML = `
         <td>${round.date}</td>
         <td class="col-golf">${course ? formatGolfName(course.name) : 'Golf supprimé'}</td>
-        <td>${gross18 ?? '—'}</td>
+        <td>${formatToPar(toPar18)}</td>
         <td>${points18 ?? '—'}</td>
       `;
 

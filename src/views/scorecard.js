@@ -11,6 +11,7 @@
 import { getRound, getCourse, getPlayer, saveRound } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
 import { formatGolfName } from '../ui/formHelpers.js';
+import { formatToPar } from '../scoring/roundSummary.js';
 
 export async function renderScorecard(container, params, navigate) {
   const round = await getRound(params.roundId);
@@ -70,7 +71,7 @@ export async function renderScorecard(container, params, navigate) {
     if (hs.status === 'played' || hs.status === 'abandoned') {
       const diff = hs.grossScore - hole.par;
       scoreCell = hs.status === 'abandoned' ? 'X' : hs.grossScore;
-      diffCell = diff > 0 ? `+${diff}` : diff;
+      diffCell = formatToPar(diff);
     }
 
     row.innerHTML = isSimplified
@@ -102,7 +103,7 @@ export async function renderScorecard(container, params, navigate) {
         <td>Total</td>
         <td>${totalPar}</td>
         <td>${playedCount > 0 ? totalGross : '—'}</td>
-        <td>${diffTotal != null ? (diffTotal > 0 ? `+${diffTotal}` : diffTotal) : '—'}</td>
+        <td>${formatToPar(diffTotal)}</td>
         <td>${totalPoints}</td>
         <td>${puttsAverage}</td>
       </tr>`;

@@ -280,17 +280,26 @@ function buildBackupSection() {
   downloadBtn.textContent = 'Télécharger (ZIP)';
   section.appendChild(downloadBtn);
 
+  const importBox = document.createElement('div');
+  importBox.className = 'import-box';
+  section.appendChild(importBox);
+
+  const importIntro = document.createElement('p');
+  importIntro.className = 'hint';
+  importIntro.textContent = "Sélectionnez votre fichier de sauvegarde (.zip ou .json). Selon votre appareil, il peut se trouver dans l'app Fichiers (iPhone), dans Google Drive, ou dans le dossier Téléchargements de votre ordinateur.";
+  importBox.appendChild(importIntro);
+
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
   importBtn.className = 'btn-secondary';
   importBtn.textContent = 'Importer';
-  section.appendChild(importBtn);
+  importBox.appendChild(importBtn);
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = '.json,application/json,.zip,application/zip';
   fileInput.hidden = true;
-  section.appendChild(fileInput);
+  importBox.appendChild(fileInput);
 
   const statusEl = document.createElement('p');
   statusEl.className = 'hint';

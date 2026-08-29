@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.51** (voir `src/version.js`).
+Version actuelle : **1.2.52** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -18,7 +18,13 @@ Version actuelle : **1.2.51** (voir `src/version.js`).
 - **HTML/CSS/JS vanilla** : pas de framework, pas de bundler, pas de dépendance npm sauf
   strictement nécessaire — deux exceptions à ce jour, toutes deux vendorées localement et
   jamais chargées depuis un CDN : pdf.js (import de cartes de score) et JSZip (export/partage
-  en ZIP).
+  en ZIP). Même principe pour les icônes : uniquement des tracés SVG inline dans
+  `src/icons/icons.js` (parfois inspirés d'un set existant comme Tabler Icons, mais jamais
+  chargés via une police d'icônes ou un CDN).
+- **Couleurs toujours via les variables de thème** (`:root` dans `style.css`), jamais une
+  couleur figée (`#fff`, `#eee`, etc.) à côté d'une couleur qui suit déjà le thème — sinon
+  texte et fond peuvent diverger et devenir illisibles en thème sombre (bug rencontré et
+  corrigé en 1.2.52 sur `.btn-secondary` et les états `:active` de plusieurs listes).
 
 ## Lancer en local
 
@@ -65,9 +71,10 @@ src/
     distance.js              Distance haversine entre deux points GPS
     calibration.js           Complétude de calibration d'un parcours, dérivation de
                               Course.source, point de référence GPS d'un parcours
-    roundSummary.js           Score brut et points stableford net d'un round ramenés à 18
-                              trous par règle de trois (utilisé par Reprendre une partie et
-                              Historique)
+    roundSummary.js           Écart au par (signé) et points stableford net d'un round
+                              ramenés à 18 trous par règle de trois, + formatToPar (mise en
+                              forme "+20"/"-2"/"0", partagée avec la Carte de score) —
+                              utilisé par Reprendre une partie et Historique
 
   geo/
     geolocation.js          Enveloppe autour de navigator.geolocation (ping ponctuel)
@@ -111,7 +118,9 @@ src/
                                   sa fermeture ne modifie jamais l'historique de navigation
 
   icons/
-    icons.js                    Set d'icônes SVG inline (pas de police/CDN externe)
+    icons.js                    Set d'icônes SVG inline (pas de police/CDN externe) ;
+                                  l'icône satellite reprend le tracé officiel de Tabler
+                                  Icons (ti-satellite, MIT), inline plutôt que via sa police
 
   views/                       Un module par écran ; chaque render(container, params,
                                 navigate) est appelé par le routeur dans src/main.js
@@ -122,11 +131,14 @@ src/
                                   sandwich de src/main.js pour garder un seul ordre partout
     settings.js                  Réglages : profil (dont mode Expert/Simplifié), clubs,
                                   section unique "Sauvegarde / Partage" (Exporter et
-                                  partager / Télécharger en ZIP / Importer .json ou .zip) —
-                                  pas de liste de golfs ici (voir Gestion parcours)
+                                  partager / Télécharger en ZIP / Importer .json ou .zip,
+                                  ce dernier dans un encadré dédié avec texte d'orientation
+                                  selon l'appareil) — pas de liste de golfs ici (voir
+                                  Gestion parcours)
     courseManage.js               Sous-menu Gestion parcours (icônes, dont une icône
-                                   satellite agrandie pour Calibrer avec le GPS) + liste des
-                                   golfs enregistrés, triée alphabétiquement (insensible à la
+                                   satellite classique agrandie pour Calibrer avec le GPS,
+                                   inspirée de Tabler ti-satellite) + liste des golfs
+                                   enregistrés, triée alphabétiquement (insensible à la
                                    casse), noms affichés en casse phrase (formatGolfName),
                                    bouton d'aide expliquant les icônes de statut de
                                    calibration
@@ -146,19 +158,19 @@ src/
                                     déroulante (7 couleurs standard), colonne "Handicap" par
                                     trou (ex-"Index (SI)"), bouton d'aide (Slope/SSS/Handicap)
     resumeRound.js                   Tableau de rounds filtrable (Golf/Année/Mois) : Date /
-                                       Golf / Score brut / Stableford net (en-têtes Score/
-                                       Stableford sur 2 lignes pour laisser plus de place à
-                                       la colonne Golf), les deux derniers ramenés à 18 trous
-                                       par règle de trois (un tiret uniquement si aucun trou
-                                       n'a de score)
+                                       Golf / Écart / Stableford net (écart au par signé,
+                                       ex: "+20"/"-2"/"0" ; en-tête Stableford net sur 2
+                                       lignes pour laisser plus de place à la colonne Golf),
+                                       les deux derniers ramenés à 18 trous par règle de
+                                       trois (un tiret uniquement si aucun trou n'a de score)
     roundNew.js                      Démarrage d'une partie (golf, départ, météo, GPS) ;
                                        bouton d'aide
     play.js                           Écran de jeu : un trou à la fois, navigation
                                        circulaire, score/putts/coups, statut de trou
     scorecard.js                      Carte de score (lecture seule / mode édition)
-    history.js                        Historique des parties terminées, même tableau et même
-                                       normalisation à 18 trous que Reprendre une partie,
-                                       filtrable (Golf/Année/Mois)
+    history.js                        Historique des parties terminées, même tableau (Écart
+                                       au par signé) et même normalisation à 18 trous que
+                                       Reprendre une partie, filtrable (Golf/Année/Mois)
     stats.js                          Statistiques (putts, stableford, distance par club,
                                        analyse lie/style) ; filtres Golf/Année/Mois en haut
                                        (s'appliquent à tout), filtre Club positionné sous les
@@ -206,6 +218,7 @@ optionnel du champ de recherche OSM en calibration quand il est déjà renseign�
 | 1.2.4 | Filtre Club en Statistiques (barre de filtres partagée Golf/Année/Mois/Club, chaque section n'appliquant que les filtres qui la concernent) ; filtres Golf/Année/Mois ajoutés à l'Historique ; composant de filtre partagé (`src/ui/filters.js`) réutilisé aussi par Reprendre une partie |
 | 1.2.5 | Renommage de l'app en **GolfStats** ; aide contextuelle (bouton "?" + bulle, `src/ui/helpOverlay.js`) sur Import PDF, Calibration GPS, Gestion parcours, Nouvelle partie, Statistiques ; calibration GPS enrichie d'un second mode de préremplissage par lien OpenStreetMap direct (`.../way/<id>`) en plus de la recherche par lieu approximatif ; menu principal et menu sandwich réordonnés avec icônes (source unique `MENU_ITEMS`) ; suppression de la liste "Golfs calibrés" dans Réglages (doublon de Gestion parcours) ; remplacement de l'ébauche de sauvegarde cloud par un export ZIP (JSZip vendoré) + partage natif (Web Share API), import acceptant .json ou .zip ; tableaux Date/Golf/Score brut/Stableford net (ramenés à 18 trous par règle de trois) sur Reprendre une partie et Historique ; Gestion parcours : tri alphabétique insensible à la casse, affichage en casse phrase, police réduite ; **correctif critique** : import statique de pdf.js dans le graphe de modules de `main.js` pouvant faire échouer le chargement de toute l'app sur certains moteurs iOS (écran blanc, seul le bandeau visible) — converti en `import()` paresseux déclenché à l'usage, plus un filet de sécurité (message d'erreur si `#app` reste vide après 4s) ; règle CSS globale `[hidden] { display: none !important; }` pour garantir définitivement la priorité de l'attribut `hidden` sur toute classe fixant `display` |
 | 1.2.51 | Reprendre une partie et Historique : en-têtes "Score brut"/"Stableford net" sur 2 lignes pour élargir la colonne Golf ; Statistiques : filtre Club déplacé sous les deux graphiques, juste au-dessus des sections qu'il affecte (`filterBar.clubFilterElement` retourné séparément par `src/ui/filters.js`) ; casse d'affichage des noms de golf harmonisée partout via une fonction unique (`formatGolfName`, `src/ui/formHelpers.js`) au lieu d'être limitée à Gestion parcours ; formulaire de golf (Nouveau parcours/Modifier parcours/Import PDF) : suppression du champ Lieu (localisation désormais uniquement via calibration GPS/OSM), "Couleur de départ jouée" en liste déroulante (Noir/Blanc/Jaune/Bleu/Rouge/Orange/Violet), colonne par-trou renommée "Index (SI)" -> "Handicap", bouton d'aide expliquant Slope/SSS/Handicap ; icône satellite agrandie pour "Calibrer avec le GPS" dans Gestion parcours ; Réglages : bouton "Télécharger (ZIP)" ajouté à côté de "Exporter et partager" pour un téléchargement direct sans passer par la feuille de partage (utile sur ordinateur) |
+| 1.2.52 | Reprendre une partie et Historique : colonne "Score brut" remplacée par "Écart" (écart signé au par, ramené à 18 trous par règle de trois, ex: "+20"/"-2"/"0") — même formatage (`formatToPar`) que celui déjà utilisé par la Carte de score, désormais factorisé dans `src/scoring/roundSummary.js` ; icône satellite remplacée par le tracé officiel Tabler `ti-satellite` (silhouette de satellite classique) dans `src/icons/icons.js` ; **correctif de contraste** : `.btn-secondary` utilisait un fond gris clair figé (`#e9e9e3`) alors que son texte suit le thème — illisible (texte clair sur fond clair) une fois le thème sombre actif ; même bug corrigé sur les états `:active` de `.menu-item`/`.menu-dropdown-item`/lignes de tableau cliquables (`#eee` figé) ; tous remplacés par une variable de thème dédiée (`--color-secondary-bg`, adaptée par thème) — convention documentée directement dans `style.css` ; Réglages : la fonction d'import est désormais entourée d'un encadré distinct (`.import-box`) avec un texte d'orientation selon l'appareil (app Fichiers/Google Drive/dossier Téléchargements) |
 
 ## Tenir ce README à jour
 

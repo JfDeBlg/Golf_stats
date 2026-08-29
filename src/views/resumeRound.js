@@ -1,14 +1,14 @@
 // Écran Reprendre une partie : tableau de rounds filtrable (Golf/Année/Mois, composant
 // partagé avec Historique et Statistiques). Le statut listé (in_progress ou completed) est
 // décidé par le menu selon le nombre de rounds en cours (cf. menu.js) et passé via
-// params.statusFilter. Colonnes Date / Golf / Score brut / Stableford net, ramenées à 18
-// trous par règle de trois (cf. src/scoring/roundSummary.js) — un tiret seulement si
-// vraiment aucun trou n'a de score. Cliquer une ligne ouvre la carte de score du round
-// (même écran que pour une partie terminée) — pas directement un trou.
+// params.statusFilter. Colonnes Date / Golf / Écart / Stableford net, ramenées à 18 trous
+// par règle de trois (cf. src/scoring/roundSummary.js) — un tiret seulement si vraiment
+// aucun trou n'a de score. Cliquer une ligne ouvre la carte de score du round (même écran
+// que pour une partie terminée) — pas directement un trou.
 
 import { getRounds, getCourses } from '../db/repository.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
-import { computeRoundSummary18 } from '../scoring/roundSummary.js';
+import { computeRoundSummary18, formatToPar } from '../scoring/roundSummary.js';
 import { formatGolfName } from '../ui/formHelpers.js';
 
 export async function renderResumeRound(container, params, navigate) {
@@ -47,20 +47,20 @@ export async function renderResumeRound(container, params, navigate) {
     const table = document.createElement('table');
     table.className = 'scorecard-table';
     const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Date</th><th class="col-golf">Golf</th><th>Score<br>brut</th><th>Stableford<br>net</th></tr>';
+    thead.innerHTML = '<tr><th>Date</th><th class="col-golf">Golf</th><th>Écart</th><th>Stableford<br>net</th></tr>';
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
 
     filtered.forEach((round) => {
       const course = courses.find((c) => c.id === round.courseId);
-      const { gross18, points18 } = computeRoundSummary18(round);
+      const { toPar18, points18 } = computeRoundSummary18(round, course);
       const row = document.createElement('tr');
       row.className = 'clickable';
       row.addEventListener('click', () => navigate('scorecard', { roundId: round.id }));
       row.innerHTML = `
         <td>${round.date}</td>
         <td class="col-golf">${course ? formatGolfName(course.name) : 'Golf supprimé'}</td>
-        <td>${gross18 ?? '—'}</td>
+        <td>${formatToPar(toPar18)}</td>
         <td>${points18 ?? '—'}</td>
       `;
       tbody.appendChild(row);
