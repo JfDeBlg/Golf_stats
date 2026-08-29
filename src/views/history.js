@@ -1,9 +1,11 @@
-// Écran Historique : liste des parties terminées, filtrable (Golf/Année/Mois), ouverture
-// et suppression.
+// Écran Historique : tableau des parties terminées, filtrable (Golf/Année/Mois). Mêmes
+// colonnes et même normalisation à 18 trous que Reprendre une partie (cf.
+// src/scoring/roundSummary.js) : Date / Golf / Score brut / Stableford net.
 
 import { getRounds, getCourses, deleteRound } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
+import { computeRoundSummary18 } from '../scoring/roundSummary.js';
 
 export async function renderHistory(container, params, navigate) {
   const [allRounds, courses] = await Promise.all([getRounds(), getCourses()]);
@@ -21,52 +23,62 @@ export async function renderHistory(container, params, navigate) {
   const filterBar = buildFilterBar({ courses }, refresh);
   container.appendChild(filterBar.element);
 
-  const list = document.createElement('div');
-  list.className = 'list-select';
-  container.appendChild(list);
+  const tableScroll = document.createElement('div');
+  tableScroll.className = 'table-scroll';
+  container.appendChild(tableScroll);
 
   function refresh() {
     const filters = filterBar.getFilters();
     const filtered = rounds.filter((r) => roundMatchesFilters(r, filters));
-    list.innerHTML = '';
+    tableScroll.innerHTML = '';
 
     if (filtered.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'hint';
       empty.textContent = 'Aucune partie ne correspond aux filtres.';
-      list.appendChild(empty);
+      tableScroll.appendChild(empty);
       return;
     }
 
+    const table = document.createElement('table');
+    table.className = 'scorecard-table';
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Date</th><th>Golf</th><th>Score brut</th><th>Stableford net</th><th></th></tr>';
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+
     filtered.forEach((round) => {
       const course = courseById.get(round.courseId);
-      const totalGross = round.holeScores.reduce((s, h) => s + (h.grossScore ?? 0), 0);
-      const totalPoints = round.holeScores.reduce((s, h) => s + (h.stablefordNetPoints ?? 0), 0);
+      const { gross18, points18 } = computeRoundSummary18(round);
+      const row = document.createElement('tr');
+      row.className = 'clickable';
+      row.addEventListener('click', () => navigate('scorecard', { roundId: round.id }));
+      row.innerHTML = `
+        <td>${round.date}</td>
+        <td>${course?.name ?? 'Golf supprimé'}</td>
+        <td>${gross18 ?? '—'}</td>
+        <td>${points18 ?? '—'}</td>
+      `;
 
-      const row = document.createElement('div');
-      row.className = 'list-item-row';
-
-      const info = document.createElement('button');
-      info.type = 'button';
-      info.className = 'list-item';
-      info.textContent = `${round.date} — ${course?.name ?? 'Golf supprimé'} — ${totalGross} coups — ${totalPoints} pts`;
-      info.addEventListener('click', () => navigate('scorecard', { roundId: round.id }));
-      row.appendChild(info);
-
+      const deleteCell = document.createElement('td');
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'btn-icon';
       deleteBtn.setAttribute('aria-label', 'Supprimer cette partie');
-      deleteBtn.appendChild(createIcon('delete', { size: 18 }));
-      deleteBtn.addEventListener('click', () => {
+      deleteBtn.appendChild(createIcon('delete', { size: 16 }));
+      deleteBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
         if (confirm('Supprimer définitivement cette partie ?')) {
           deleteRound(round.id).then(() => navigate('history', {}, { replace: true }));
         }
       });
-      row.appendChild(deleteBtn);
+      deleteCell.appendChild(deleteBtn);
+      row.appendChild(deleteCell);
 
-      list.appendChild(row);
+      tbody.appendChild(row);
     });
+    table.appendChild(tbody);
+    tableScroll.appendChild(table);
   }
 
   refresh();

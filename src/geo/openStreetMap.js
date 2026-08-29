@@ -157,3 +157,35 @@ export async function findGolfCoursesByAddress(address) {
 
   return { center, courses };
 }
+
+// Extrait l'identifiant numérique d'une URL de way OpenStreetMap
+// (ex: https://www.openstreetmap.org/way/34513467 -> "34513467").
+export function extractOsmWayId(url) {
+  const match = /openstreetmap\.org\/way\/(\d+)/.exec(url.trim());
+  return match ? match[1] : null;
+}
+
+// Repli direct quand l'utilisateur a déjà identifié la bonne page way sur
+// openstreetmap.org : récupère son centre sans passer par un géocodage Nominatim.
+export async function resolveOsmWayLink(url) {
+  const wayId = extractOsmWayId(url);
+  if (!wayId) {
+    throw new Error('Lien OpenStreetMap invalide (attendu : .../way/12345).');
+  }
+  const query = `[out:json][timeout:25];way(${wayId});out center tags;`;
+  const response = await fetch(OVERPASS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `data=${encodeURIComponent(query)}`,
+  });
+  if (!response.ok) {
+    throw new Error('Requête OpenStreetMap impossible (serveur indisponible).');
+  }
+  const data = await response.json();
+  const way = (data.elements ?? [])[0];
+  const position = way ? elementPosition(way) : null;
+  if (!position) {
+    throw new Error(`Way OpenStreetMap #${wayId} introuvable.`);
+  }
+  return { name: way.tags?.name ?? `Way OSM #${wayId}`, position };
+}

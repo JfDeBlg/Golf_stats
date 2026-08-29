@@ -7,11 +7,23 @@ import { haversineDistance } from '../scoring/distance.js';
 import { computeCourseReferencePoint } from '../scoring/calibration.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
 import { createField } from '../ui/formHelpers.js';
+import { createHelpButton } from '../ui/helpOverlay.js';
 
 const WIND_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 const LOCATE_RADIUS_M = 2000;
 
+const ROUND_NEW_HELP_TEXT = [
+  "\"Localiser mon golf\" fait un ping GPS ponctuel et propose le golf calibré le plus proche : la sélection manuelle du golf et du départ reste toujours disponible juste en dessous.",
+  'Le trou de départ (1 ou 10) se choisit toujours à la main — jamais déduit automatiquement de la position, pour éviter toute erreur silencieuse en début de partie.',
+  "La météo est entièrement optionnelle et n'empêche pas de démarrer la partie.",
+];
+
 export async function renderRoundNew(container, params, navigate) {
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row';
+  headerRow.appendChild(createHelpButton(ROUND_NEW_HELP_TEXT));
+  container.appendChild(headerRow);
+
   const courses = await getCourses();
   if (courses.length === 0) {
     const empty = document.createElement('p');

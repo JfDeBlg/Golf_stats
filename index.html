@@ -6,21 +6,38 @@
   <meta name="theme-color" content="#1b4332" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Golf Score" />
+  <meta name="apple-mobile-web-app-title" content="GolfStats" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="style.css" />
-  <title>Golf Score & GPS</title>
+  <title>GolfStats</title>
 </head>
 <body>
   <header class="app-header">
     <button id="btn-back" class="btn-icon" hidden aria-label="Retour"></button>
-    <h1 id="app-title">Golf Score</h1>
+    <h1 id="app-title">GolfStats</h1>
     <button id="btn-menu" class="btn-icon" aria-label="Menu" aria-haspopup="true" aria-expanded="false"></button>
     <nav id="menu-dropdown" class="menu-dropdown" hidden></nav>
   </header>
   <main id="app"></main>
   <script type="module" src="src/main.js"></script>
+  <script>
+    // Filet de sécurité indépendant du graphe de modules ES : si le module principal
+    // n'a pas réussi à peupler #app après quelques secondes (erreur d'évaluation d'un
+    // module importé, incompatibilité moteur JS, etc.), afficher un message exploitable
+    // plutôt qu'un écran vide (bandeau seul). Un script classique s'exécute même si
+    // src/main.js et sa chaîne d'imports échouent entièrement.
+    setTimeout(function () {
+      var app = document.getElementById('app');
+      if (app && app.innerHTML.trim() === '') {
+        app.innerHTML =
+          '<p style="padding:1rem;color:#b91c1c;">' +
+          "Erreur au chargement de l'application. Fermez complètement l'app puis " +
+          'rouvrez-la. Si le problème persiste, effacez les données de site pour ' +
+          'cette page dans les réglages du navigateur.</p>';
+      }
+    }, 4000);
+  </script>
 </body>
 </html>

@@ -1,8 +1,11 @@
 // Écran Gestion parcours : sous-menu regroupant les 3 actions sur les golfs, plus un
 // raccourci direct vers chaque golf déjà enregistré (édition ou suppression en un clic).
+// La liste est triée par ordre alphabétique insensible à la casse ; le nom est affiché en
+// casse phrase (transformation d'affichage uniquement, la donnée stockée n'est pas modifiée).
 
 import { getCourses, deleteCourse } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
+import { createHelpButton } from '../ui/helpOverlay.js';
 
 const ITEMS = [
   { label: 'Nouveau parcours', route: 'courseNew' },
@@ -12,7 +15,23 @@ const ITEMS = [
   { label: 'Supprimer parcours', route: 'courseDelete' },
 ];
 
+const MANAGE_HELP_TEXT = [
+  "Chaque golf de la liste peut porter une icône : une coche verte signifie que le parcours a été calibré sur place, trou par trou, via le GPS.",
+  "Une icône satellite signifie que des repères ont été préremplis automatiquement via OpenStreetMap, mais pas encore validés sur le terrain.",
+  "Aucune icône : le parcours n'a pas encore été calibré (saisie manuelle ou import PDF uniquement).",
+];
+
+function toSentenceCase(name) {
+  if (!name) return name;
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
 export async function renderCourseManage(container, params, navigate) {
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row';
+  headerRow.appendChild(createHelpButton(MANAGE_HELP_TEXT));
+  container.appendChild(headerRow);
+
   const nav = document.createElement('nav');
   nav.className = 'menu-list';
 
@@ -35,7 +54,8 @@ export async function renderCourseManage(container, params, navigate) {
   container.appendChild(list);
 
   async function refresh() {
-    const courses = (await getCourses()).sort((a, b) => a.name.localeCompare(b.name));
+    const courses = (await getCourses())
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     list.innerHTML = '';
 
     if (courses.length === 0) {
@@ -52,9 +72,9 @@ export async function renderCourseManage(container, params, navigate) {
 
       const nameBtn = document.createElement('button');
       nameBtn.type = 'button';
-      nameBtn.className = 'list-item';
+      nameBtn.className = 'list-item course-name-item';
       nameBtn.appendChild(createIcon('edit', { size: 16 }));
-      nameBtn.appendChild(document.createTextNode(course.name));
+      nameBtn.appendChild(document.createTextNode(toSentenceCase(course.name)));
       if (course.source === 'calibrated') {
         nameBtn.appendChild(createIcon('check', { size: 16 }));
       } else if (course.source === 'osm_prefilled') {

@@ -14,6 +14,55 @@
   box-sizing: border-box;
 }
 
+/* Garantie globale : l'attribut hidden doit toujours l'emporter, quelle que soit la classe
+   posée sur l'élément. Sans ce filet, une classe qui fixe `display` (ex: .form, .btn-icon,
+   .menu-dropdown) prend le pas sur la règle par défaut du navigateur pour [hidden] — bug
+   déjà rencontré trois fois (bouton retour, menu sandwich, repli adresse OSM) avant cette
+   règle unique et définitive. */
+[hidden] {
+  display: none !important;
+}
+
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 100;
+}
+.help-box {
+  position: relative;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius);
+  padding: 2.5rem 1.25rem 1.25rem;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+.help-box p {
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+.help-box p:last-child {
+  margin-bottom: 0;
+}
+.help-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
+.screen-header-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.25rem;
+}
+
 html,
 body {
   margin: 0;
@@ -51,6 +100,7 @@ body {
 }
 
 .btn-icon {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
@@ -60,9 +110,6 @@ body {
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius);
   cursor: pointer;
-}
-.btn-icon:not([hidden]) {
-  display: inline-flex;
 }
 .btn-icon:active {
   background: rgba(255, 255, 255, 0.15);
@@ -75,6 +122,8 @@ body {
 }
 
 .menu-dropdown {
+  display: flex;
+  flex-direction: column;
   position: absolute;
   top: 100%;
   right: 0.75rem;
@@ -87,11 +136,10 @@ body {
   overflow: hidden;
   z-index: 20;
 }
-.menu-dropdown:not([hidden]) {
-  display: flex;
-  flex-direction: column;
-}
 .menu-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.75rem 1rem;
   border: none;
   border-bottom: 1px solid var(--color-border);
@@ -115,6 +163,9 @@ body {
 }
 
 .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   padding: 1rem;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
@@ -334,6 +385,9 @@ select {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.course-name-item {
+  font-size: 0.9rem;
 }
 
 .play-view {

@@ -1,16 +1,17 @@
 // Écran Menu principal. MENU_ITEMS et activateMenuItem sont exportés pour être réutilisés
 // par le menu sandwich du bandeau (src/main.js), qui donne accès aux mêmes options depuis
-// n'importe quel écran.
+// n'importe quel écran — un seul point de vérité pour l'ordre et les icônes.
 
 import { getRounds } from '../db/repository.js';
+import { createIcon } from '../ui/icons.js';
 
 export const MENU_ITEMS = [
-  { label: 'Réglages', route: 'settings' },
-  { label: 'Reprendre une partie', route: 'resumeRound' },
-  { label: 'Nouvelle partie', route: 'roundNew' },
-  { label: 'Gestion parcours', route: 'courseManage' },
-  { label: 'Historique', route: 'history' },
-  { label: 'Statistiques', route: 'stats' },
+  { label: 'Nouvelle partie', route: 'roundNew', icon: 'document' },
+  { label: 'Reprendre une partie', route: 'resumeRound', icon: 'folder' },
+  { label: 'Historique', route: 'history', icon: 'clock' },
+  { label: 'Statistiques', route: 'stats', icon: 'chart' },
+  { label: 'Gestion parcours', route: 'courseManage', icon: 'golfer' },
+  { label: 'Réglages', route: 'settings', icon: 'gear' },
 ];
 
 // "Reprendre une partie" saute directement au round en cours s'il n'y en a qu'un ; sinon
@@ -44,7 +45,8 @@ export function renderMenu(container, params, navigate) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'menu-item';
-    btn.textContent = item.label;
+    btn.appendChild(createIcon(item.icon, { size: 20 }));
+    btn.appendChild(document.createTextNode(item.label));
     btn.addEventListener('click', () => activateMenuItem(item, navigate));
     nav.appendChild(btn);
   });

@@ -1,6 +1,6 @@
 {
-  "name": "Golf Score & GPS",
-  "short_name": "Golf Score",
+  "name": "GolfStats",
+  "short_name": "GolfStats",
   "description": "Carte de score de golf avec assistance GPS ponctuelle",
   "start_url": "./index.html",
   "scope": "./",

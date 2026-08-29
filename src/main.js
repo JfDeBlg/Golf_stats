@@ -18,7 +18,7 @@ import { renderHistory } from './views/history.js';
 import { renderStats } from './views/stats.js';
 
 const routes = {
-  menu: { render: renderMenu, title: `Golf Score — v${APP_VERSION}`, showBack: false },
+  menu: { render: renderMenu, title: `GolfStats — v${APP_VERSION}`, showBack: false },
   settings: { render: renderSettings, title: 'Réglages', showBack: true },
   courseManage: { render: renderCourseManage, title: 'Gestion parcours', showBack: true },
   courseNew: { render: renderCourseNew, title: 'Nouveau parcours', showBack: true },
@@ -49,7 +49,8 @@ MENU_ITEMS.forEach((item) => {
   const itemBtn = document.createElement('button');
   itemBtn.type = 'button';
   itemBtn.className = 'menu-dropdown-item';
-  itemBtn.textContent = item.label;
+  itemBtn.appendChild(createIcon(item.icon, { size: 18 }));
+  itemBtn.appendChild(document.createTextNode(item.label));
   itemBtn.addEventListener('click', () => {
     closeMenuDropdown();
     activateMenuItem(item, navigate);

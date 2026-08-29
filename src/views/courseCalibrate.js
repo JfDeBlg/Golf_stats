@@ -10,10 +10,18 @@
 
 import { getCourses, getCourse, saveCourse } from '../db/repository.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
-import { prefillFromOpenStreetMap, prefillFromCoordinates, findGolfCoursesByAddress } from '../geo/openStreetMap.js';
+import {
+  prefillFromOpenStreetMap, prefillFromCoordinates, findGolfCoursesByAddress, resolveOsmWayLink,
+} from '../geo/openStreetMap.js';
 import { deriveCourseSource, isCourseFullyCalibrated } from '../scoring/calibration.js';
 import { createIcon } from '../ui/icons.js';
 import { createField } from '../ui/formHelpers.js';
+import { createHelpButton } from '../ui/helpOverlay.js';
+
+const CALIBRATE_HELP_TEXT = [
+  "Renseignez d'abord, pour chaque trou, son numéro, son index de difficulté (handicap) et sa distance.",
+  "Ensuite, aidez-vous d'OpenStreetMap pour localiser précisément le parcours avant de calibrer les départs et les greens sur place.",
+];
 
 function nextHoleNumber(n) {
   return n >= 18 ? 1 : n + 1;
@@ -29,6 +37,11 @@ function isHoleComplete(hole, tees) {
 }
 
 export async function renderCourseCalibrate(container, params, navigate) {
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row';
+  headerRow.appendChild(createHelpButton(CALIBRATE_HELP_TEXT));
+  container.appendChild(headerRow);
+
   const courses = await getCourses();
 
   if (courses.length === 0) {
@@ -136,6 +149,24 @@ export async function renderCourseCalibrate(container, params, navigate) {
   }
   osmForm.appendChild(osmStatus);
 
+  // --- Option 2 : lien OpenStreetMap direct (toujours visible, pas besoin d'attendre un
+  // échec de la recherche par lieu ci-dessus — utile quand la bonne page way est déjà
+  // identifiée sur openstreetmap.org) ---
+  const directLinkInput = document.createElement('input');
+  directLinkInput.type = 'text';
+  directLinkInput.placeholder = 'https://www.openstreetmap.org/way/34513467';
+  osmForm.appendChild(createField('Lien OpenStreetMap direct', directLinkInput));
+
+  const directLinkBtn = document.createElement('button');
+  directLinkBtn.type = 'button';
+  directLinkBtn.className = 'btn-secondary';
+  directLinkBtn.textContent = 'Utiliser ce lien';
+  osmForm.appendChild(directLinkBtn);
+
+  const directLinkStatus = document.createElement('p');
+  directLinkStatus.className = 'hint';
+  osmForm.appendChild(directLinkStatus);
+
   // --- Repli : recherche par adresse (visible seulement après un échec de la recherche
   // directe ci-dessus) ---
   const addressSection = document.createElement('div');
@@ -203,25 +234,39 @@ export async function renderCourseCalibrate(container, params, navigate) {
     }
   });
 
-  async function applyGolfCourseSelection(selected) {
-    addressStatus.className = 'hint';
-    addressStatus.textContent = `Recherche des repères pour ${selected.name}…`;
-    courseChoiceList.innerHTML = '';
+  async function applyGolfCourseSelection(selected, statusEl) {
+    statusEl.className = 'hint';
+    statusEl.textContent = `Recherche des repères pour ${selected.name}…`;
     try {
       const { matches } = await prefillFromCoordinates(selected.position);
       const filled = applyMatches(matches);
       if (filled === 0) {
-        addressStatus.className = 'error-msg';
-        addressStatus.textContent = 'Pas de repères détaillés disponibles, calibration manuelle nécessaire.';
+        statusEl.className = 'error-msg';
+        statusEl.textContent = 'Pas de repères détaillés disponibles, calibration manuelle nécessaire.';
         return;
       }
       await saveCourse(course);
       showOsmSuccess(filled, selected.name);
     } catch (err) {
-      addressStatus.className = 'error-msg';
-      addressStatus.textContent = err.message;
+      statusEl.className = 'error-msg';
+      statusEl.textContent = err.message;
     }
   }
+
+  directLinkBtn.addEventListener('click', async () => {
+    directLinkStatus.className = 'hint';
+    directLinkStatus.textContent = 'Recherche en cours…';
+    directLinkBtn.disabled = true;
+    try {
+      const selected = await resolveOsmWayLink(directLinkInput.value);
+      await applyGolfCourseSelection(selected, directLinkStatus);
+    } catch (err) {
+      directLinkStatus.className = 'error-msg';
+      directLinkStatus.textContent = err.message;
+    } finally {
+      directLinkBtn.disabled = false;
+    }
+  });
 
   addressBtn.addEventListener('click', async () => {
     addressStatus.className = 'hint';
@@ -237,7 +282,7 @@ export async function renderCourseCalibrate(container, params, navigate) {
         return;
       }
       if (foundCourses.length === 1) {
-        await applyGolfCourseSelection(foundCourses[0]);
+        await applyGolfCourseSelection(foundCourses[0], addressStatus);
         return;
       }
       addressStatus.className = 'hint';
@@ -247,7 +292,7 @@ export async function renderCourseCalibrate(container, params, navigate) {
         choiceBtn.type = 'button';
         choiceBtn.className = 'list-item';
         choiceBtn.textContent = `${c.name} (à ${c.distance} m)`;
-        choiceBtn.addEventListener('click', () => applyGolfCourseSelection(c));
+        choiceBtn.addEventListener('click', () => applyGolfCourseSelection(c, addressStatus));
         courseChoiceList.appendChild(choiceBtn);
       });
     } catch (err) {

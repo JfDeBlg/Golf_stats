@@ -1,7 +1,11 @@
-// Écran Réglages : profil joueur, sac de clubs, et placeholders golfs calibrés / cloud.
+// Écran Réglages : profil joueur, sac de clubs, sauvegarde/partage.
+// La liste des golfs (avec indicateurs de calibration) vit uniquement dans Gestion
+// parcours — pas de doublon ici.
 
 import { getPlayer, savePlayer, getClubs, saveClub, deleteClub } from '../db/repository.js';
-import { buildExportData, downloadExport, validateExportData, importExportData } from '../db/exportImport.js';
+import {
+  buildExportData, buildExportZipFile, shareOrDownloadZip, readExportFile, importExportData,
+} from '../db/exportImport.js';
 import { createField } from '../ui/formHelpers.js';
 import { createIcon } from '../ui/icons.js';
 import { STANDARD_CLUBS } from '../data/standardClubs.js';
@@ -12,9 +16,7 @@ const STANDARD_CLUBS_DATALIST_ID = 'standard-club-names';
 export async function renderSettings(container) {
   container.appendChild(await buildProfileSection());
   container.appendChild(await buildClubsSection());
-  container.appendChild(buildCalibratedCoursesSection());
-  container.appendChild(buildDataSection());
-  container.appendChild(buildCloudBackupSection());
+  container.appendChild(buildBackupSection());
 }
 
 async function buildProfileSection() {
@@ -258,45 +260,29 @@ function buildClubRow(club, index, clubs, refreshClubs) {
   return row;
 }
 
-function buildCalibratedCoursesSection() {
+function buildBackupSection() {
   const section = document.createElement('section');
   section.className = 'card';
 
   const title = document.createElement('h2');
-  title.textContent = 'Golfs calibrés';
+  title.textContent = 'Sauvegarde / Partage';
   section.appendChild(title);
 
-  const hint = document.createElement('p');
-  hint.className = 'hint';
-  hint.textContent = 'Disponible au Lot 2 (calibration GPS).';
-  section.appendChild(hint);
-
-  return section;
-}
-
-function buildDataSection() {
-  const section = document.createElement('section');
-  section.className = 'card';
-
-  const title = document.createElement('h2');
-  title.textContent = 'Données locales';
-  section.appendChild(title);
-
-  const exportBtn = document.createElement('button');
-  exportBtn.type = 'button';
-  exportBtn.className = 'btn-secondary';
-  exportBtn.textContent = 'Exporter mes données';
-  section.appendChild(exportBtn);
+  const shareBtn = document.createElement('button');
+  shareBtn.type = 'button';
+  shareBtn.className = 'btn-primary';
+  shareBtn.textContent = 'Exporter et partager';
+  section.appendChild(shareBtn);
 
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
   importBtn.className = 'btn-secondary';
-  importBtn.textContent = 'Importer des données';
+  importBtn.textContent = 'Importer';
   section.appendChild(importBtn);
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
-  fileInput.accept = '.json,application/json';
+  fileInput.accept = '.json,application/json,.zip,application/zip';
   fileInput.hidden = true;
   section.appendChild(fileInput);
 
@@ -304,9 +290,22 @@ function buildDataSection() {
   statusEl.className = 'hint';
   section.appendChild(statusEl);
 
-  exportBtn.addEventListener('click', async () => {
-    const exportData = await buildExportData();
-    downloadExport(exportData);
+  shareBtn.addEventListener('click', async () => {
+    statusEl.className = 'hint';
+    statusEl.textContent = "Préparation de l'export…";
+    shareBtn.disabled = true;
+    try {
+      const exportData = await buildExportData();
+      const zipFile = await buildExportZipFile(exportData);
+      const result = await shareOrDownloadZip(zipFile);
+      statusEl.className = 'status-msg';
+      statusEl.textContent = result === 'shared' ? 'Partage lancé.' : 'Fichier ZIP téléchargé.';
+    } catch (err) {
+      statusEl.className = 'error-msg';
+      statusEl.textContent = `Export impossible : ${err.message}`;
+    } finally {
+      shareBtn.disabled = false;
+    }
   });
 
   importBtn.addEventListener('click', () => fileInput.click());
@@ -321,9 +320,7 @@ function buildDataSection() {
 
     let parsed;
     try {
-      const text = await file.text();
-      parsed = JSON.parse(text);
-      validateExportData(parsed);
+      parsed = await readExportFile(file);
     } catch (err) {
       statusEl.className = 'error-msg';
       statusEl.textContent = `Fichier invalide : ${err.message}`;
@@ -340,29 +337,6 @@ function buildDataSection() {
     statusEl.textContent = 'Import réussi. Rechargement...';
     setTimeout(() => window.location.reload(), 800);
   });
-
-  return section;
-}
-
-function buildCloudBackupSection() {
-  const section = document.createElement('section');
-  section.className = 'card';
-
-  const title = document.createElement('h2');
-  title.textContent = 'Sauvegarde cloud';
-  section.appendChild(title);
-
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn-secondary';
-  btn.textContent = 'Sauvegarder sur Google Drive';
-  btn.disabled = true;
-  section.appendChild(btn);
-
-  const hint = document.createElement('p');
-  hint.className = 'hint';
-  hint.textContent = 'Disponible au Lot 4.';
-  section.appendChild(hint);
 
   return section;
 }

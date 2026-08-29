@@ -12,7 +12,14 @@
 import { getRounds, getClubs, getCourses, getPlayer } from '../db/repository.js';
 import { buildLineChart } from '../ui/lineChart.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
+import { createHelpButton } from '../ui/helpOverlay.js';
 import { LIE_OPTIONS, SHAPE_OPTIONS } from '../data/shotOptions.js';
+
+const STATS_HELP_TEXT = [
+  'Les filtres Golf/Année/Mois/Club en haut de l\'écran sont partagés par toutes les sections ci-dessous, mais chacune n\'applique que les filtres qui la concernent.',
+  'La moyenne de putts et les deux graphiques ignorent le filtre Club (un round entier n\'a pas de club associé) ; les lignes pointillées sont vos objectifs (2 putts/trou, 36 points).',
+  'Le tableau de distance et l\'analyse lie/style tiennent compte de tous les filtres, y compris Club.',
+];
 
 function formatShortDate(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -254,6 +261,11 @@ function renderFilteredContent(container, allRounds, clubs, isSimplified, filter
 }
 
 export async function renderStats(container) {
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row';
+  headerRow.appendChild(createHelpButton(STATS_HELP_TEXT));
+  container.appendChild(headerRow);
+
   const [allRounds, clubs, courses, player] = await Promise.all([
     getRounds(), getClubs(), getCourses(), getPlayer(),
   ]);
