@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.52** (voir `src/version.js`).
+Version actuelle : **1.2.53** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -130,11 +130,11 @@ src/
                                   MENU_ITEMS/activateMenuItem, réutilisés par le menu
                                   sandwich de src/main.js pour garder un seul ordre partout
     settings.js                  Réglages : profil (dont mode Expert/Simplifié), clubs,
-                                  section unique "Sauvegarde / Partage" (Exporter et
-                                  partager / Télécharger en ZIP / Importer .json ou .zip,
-                                  ce dernier dans un encadré dédié avec texte d'orientation
-                                  selon l'appareil) — pas de liste de golfs ici (voir
-                                  Gestion parcours)
+                                  section "Sauvegarde / Partage" avec un encadré distinct
+                                  par action (Exporter et partager / Télécharger en ZIP /
+                                  Importer .json ou .zip), chacun avec sa propre phrase
+                                  d'explication (buildActionBox) — pas de liste de golfs ici
+                                  (voir Gestion parcours)
     courseManage.js               Sous-menu Gestion parcours (icônes, dont une icône
                                    satellite classique agrandie pour Calibrer avec le GPS,
                                    inspirée de Tabler ti-satellite) + liste des golfs
@@ -219,6 +219,7 @@ optionnel du champ de recherche OSM en calibration quand il est déjà renseign�
 | 1.2.5 | Renommage de l'app en **GolfStats** ; aide contextuelle (bouton "?" + bulle, `src/ui/helpOverlay.js`) sur Import PDF, Calibration GPS, Gestion parcours, Nouvelle partie, Statistiques ; calibration GPS enrichie d'un second mode de préremplissage par lien OpenStreetMap direct (`.../way/<id>`) en plus de la recherche par lieu approximatif ; menu principal et menu sandwich réordonnés avec icônes (source unique `MENU_ITEMS`) ; suppression de la liste "Golfs calibrés" dans Réglages (doublon de Gestion parcours) ; remplacement de l'ébauche de sauvegarde cloud par un export ZIP (JSZip vendoré) + partage natif (Web Share API), import acceptant .json ou .zip ; tableaux Date/Golf/Score brut/Stableford net (ramenés à 18 trous par règle de trois) sur Reprendre une partie et Historique ; Gestion parcours : tri alphabétique insensible à la casse, affichage en casse phrase, police réduite ; **correctif critique** : import statique de pdf.js dans le graphe de modules de `main.js` pouvant faire échouer le chargement de toute l'app sur certains moteurs iOS (écran blanc, seul le bandeau visible) — converti en `import()` paresseux déclenché à l'usage, plus un filet de sécurité (message d'erreur si `#app` reste vide après 4s) ; règle CSS globale `[hidden] { display: none !important; }` pour garantir définitivement la priorité de l'attribut `hidden` sur toute classe fixant `display` |
 | 1.2.51 | Reprendre une partie et Historique : en-têtes "Score brut"/"Stableford net" sur 2 lignes pour élargir la colonne Golf ; Statistiques : filtre Club déplacé sous les deux graphiques, juste au-dessus des sections qu'il affecte (`filterBar.clubFilterElement` retourné séparément par `src/ui/filters.js`) ; casse d'affichage des noms de golf harmonisée partout via une fonction unique (`formatGolfName`, `src/ui/formHelpers.js`) au lieu d'être limitée à Gestion parcours ; formulaire de golf (Nouveau parcours/Modifier parcours/Import PDF) : suppression du champ Lieu (localisation désormais uniquement via calibration GPS/OSM), "Couleur de départ jouée" en liste déroulante (Noir/Blanc/Jaune/Bleu/Rouge/Orange/Violet), colonne par-trou renommée "Index (SI)" -> "Handicap", bouton d'aide expliquant Slope/SSS/Handicap ; icône satellite agrandie pour "Calibrer avec le GPS" dans Gestion parcours ; Réglages : bouton "Télécharger (ZIP)" ajouté à côté de "Exporter et partager" pour un téléchargement direct sans passer par la feuille de partage (utile sur ordinateur) |
 | 1.2.52 | Reprendre une partie et Historique : colonne "Score brut" remplacée par "Écart" (écart signé au par, ramené à 18 trous par règle de trois, ex: "+20"/"-2"/"0") — même formatage (`formatToPar`) que celui déjà utilisé par la Carte de score, désormais factorisé dans `src/scoring/roundSummary.js` ; icône satellite remplacée par le tracé officiel Tabler `ti-satellite` (silhouette de satellite classique) dans `src/icons/icons.js` ; **correctif de contraste** : `.btn-secondary` utilisait un fond gris clair figé (`#e9e9e3`) alors que son texte suit le thème — illisible (texte clair sur fond clair) une fois le thème sombre actif ; même bug corrigé sur les états `:active` de `.menu-item`/`.menu-dropdown-item`/lignes de tableau cliquables (`#eee` figé) ; tous remplacés par une variable de thème dédiée (`--color-secondary-bg`, adaptée par thème) — convention documentée directement dans `style.css` ; Réglages : la fonction d'import est désormais entourée d'un encadré distinct (`.import-box`) avec un texte d'orientation selon l'appareil (app Fichiers/Google Drive/dossier Téléchargements) |
+| 1.2.53 | Réglages, section "Sauvegarde / Partage" : le bloc unique à 3 boutons devient 3 encadrés séparés (`.action-box`, ex-`.import-box` généralisée), chacun avec sa propre phrase d'explication sous le bouton (Exporter et partager / Télécharger en ZIP / Importer) — ajustement de présentation uniquement, le mécanisme d'export/import est inchangé |
 
 ## Tenir ce README à jour
 

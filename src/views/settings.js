@@ -260,6 +260,17 @@ function buildClubRow(club, index, clubs, refreshClubs) {
   return row;
 }
 
+function buildActionBox(button, explanationText) {
+  const box = document.createElement('div');
+  box.className = 'action-box';
+  box.appendChild(button);
+  const explanation = document.createElement('p');
+  explanation.className = 'hint';
+  explanation.textContent = explanationText;
+  box.appendChild(explanation);
+  return box;
+}
+
 function buildBackupSection() {
   const section = document.createElement('section');
   section.className = 'card';
@@ -272,34 +283,35 @@ function buildBackupSection() {
   shareBtn.type = 'button';
   shareBtn.className = 'btn-primary';
   shareBtn.textContent = 'Exporter et partager';
-  section.appendChild(shareBtn);
+  section.appendChild(buildActionBox(
+    shareBtn,
+    'Envoie une copie de vos données par mail, message, AirDrop ou toute autre app installée sur votre téléphone.'
+  ));
 
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
   downloadBtn.className = 'btn-secondary';
   downloadBtn.textContent = 'Télécharger (ZIP)';
-  section.appendChild(downloadBtn);
-
-  const importBox = document.createElement('div');
-  importBox.className = 'import-box';
-  section.appendChild(importBox);
-
-  const importIntro = document.createElement('p');
-  importIntro.className = 'hint';
-  importIntro.textContent = "Sélectionnez votre fichier de sauvegarde (.zip ou .json). Selon votre appareil, il peut se trouver dans l'app Fichiers (iPhone), dans Google Drive, ou dans le dossier Téléchargements de votre ordinateur.";
-  importBox.appendChild(importIntro);
+  section.appendChild(buildActionBox(
+    downloadBtn,
+    'Enregistre directement le fichier de sauvegarde sur cet appareil, sans passer par le partage (utile notamment sur ordinateur).'
+  ));
 
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
   importBtn.className = 'btn-secondary';
   importBtn.textContent = 'Importer';
-  importBox.appendChild(importBtn);
+  const importBox = buildActionBox(
+    importBtn,
+    "Restaure vos données à partir d'un fichier de sauvegarde (.zip ou .json) précédemment exporté. Remplace toutes les données actuelles après confirmation."
+  );
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = '.json,application/json,.zip,application/zip';
   fileInput.hidden = true;
   importBox.appendChild(fileInput);
+  section.appendChild(importBox);
 
   const statusEl = document.createElement('p');
   statusEl.className = 'hint';

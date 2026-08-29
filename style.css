@@ -198,7 +198,7 @@ body {
   font-size: 1rem;
 }
 
-.import-box {
+.action-box {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -207,6 +207,9 @@ body {
   background: var(--color-bg);
   padding: 0.75rem;
   margin-top: 0.75rem;
+}
+.action-box:first-of-type {
+  margin-top: 0;
 }
 
 .form {
