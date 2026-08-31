@@ -2,7 +2,7 @@
 // CACHE_NAME embarque la version de l'app pour forcer l'invalidation du cache à chaque
 // nouveau lot déployé — garder ce numéro synchronisé avec src/version.js (APP_VERSION).
 
-const CACHE_NAME = 'golf-app-cache-v1.2.53';
+const CACHE_NAME = 'golf-app-cache-v1.2.54';
 const ASSETS = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const ASSETS = [
   './src/ui/formHelpers.js',
   './src/ui/filters.js',
   './src/ui/lineChart.js',
+  './src/ui/barChart.js',
   './src/ui/icons.js',
   './src/ui/helpOverlay.js',
   './src/icons/icons.js',

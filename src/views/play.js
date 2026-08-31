@@ -12,7 +12,14 @@ import { haversineDistance } from '../scoring/distance.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
 import { createField, createButtonGroup } from '../ui/formHelpers.js';
 import { createIcon } from '../ui/icons.js';
-import { LIE_OPTIONS, SHAPE_OPTIONS } from '../data/shotOptions.js';
+import { createHelpButton } from '../ui/helpOverlay.js';
+import { LIE_OPTIONS, SHAPE_OPTIONS, CONTACT_OPTIONS } from '../data/shotOptions.js';
+
+const PLAY_HELP_TEXT = [
+  "L'en-tête (trou, par, distance totale du départ joué) reste visible en haut de l'écran pendant que vous faites défiler les coups.",
+  "Sur chaque coup : les boutons \"Départ\" et \"Arrivée\" font chacun un ping GPS ponctuel ; dès que les deux sont renseignés, la distance parcourue est calculée et affichée automatiquement. Le premier coup d'un trou est préempli avec le départ calibré ; les coups suivants reprennent l'arrivée du coup précédent si elle est déjà renseignée — vous pouvez toujours repinguer pour corriger.",
+  "\"En régulation sur green\" (GIR) se coche manuellement une fois le trou terminé, si le green a été atteint en par − 2 coups ou moins.",
+];
 
 function nextHoleNumber(n) {
   return n >= 18 ? 1 : n + 1;
@@ -32,18 +39,20 @@ export async function renderPlay(container, params, navigate) {
   const player = await getPlayer();
   const isSimplified = player?.appMode === 'simplified';
 
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row';
+  headerRow.appendChild(createHelpButton(PLAY_HELP_TEXT));
+  container.appendChild(headerRow);
+
   const wrapper = document.createElement('div');
   wrapper.className = 'play-view';
 
   const header = document.createElement('div');
   header.className = 'play-header';
   const headerTitle = document.createElement('h2');
-  headerTitle.textContent = `Trou ${holeNumber}`;
-  const headerInfo = document.createElement('p');
-  headerInfo.className = 'hint';
-  headerInfo.textContent = `Par ${hole.par} — Index ${hole.strokeIndex}`;
+  const teeDistance = hole.distanceByTee?.[round.teeColor];
+  headerTitle.textContent = `Trou ${holeNumber} - Par ${hole.par}` + (teeDistance != null ? ` - ${teeDistance}m` : '');
   header.appendChild(headerTitle);
-  header.appendChild(headerInfo);
   wrapper.appendChild(header);
 
   if (!isSimplified) {
@@ -117,6 +126,15 @@ export async function renderPlay(container, params, navigate) {
     puttsInput.min = '0';
     puttsInput.value = holeScore.putts ?? '';
     form.appendChild(createField('Putts', puttsInput));
+
+    const girInput = document.createElement('input');
+    girInput.type = 'checkbox';
+    girInput.checked = holeScore.girHit === true;
+    form.appendChild(createField('En régulation sur green', girInput));
+    girInput.addEventListener('change', async () => {
+      holeScore.girHit = girInput.checked;
+      await persist();
+    });
 
     const stablefordPreview = document.createElement('p');
     stablefordPreview.className = 'stableford-preview';
@@ -245,11 +263,60 @@ export async function renderPlay(container, params, navigate) {
           row.appendChild(removeBtn);
           card.appendChild(row);
 
+          // Boutons GPS explicites Départ/Arrivée (remplacent le chaînage implicite de la
+          // v1.2.0) : chacun fait un ping ponctuel haute précision indépendant. Dès que les
+          // deux positions sont connues, la distance (haversine) est calculée et affichée
+          // automatiquement dans le champ ci-dessus, sans action supplémentaire. Un échec de
+          // géolocalisation ne bloque jamais la saisie du reste du coup.
+          const gpsRow = document.createElement('div');
+          gpsRow.className = 'shot-gps-row';
+
+          const gpsStatus = document.createElement('p');
+          gpsStatus.className = 'hint';
+
+          async function capturePosition(field, btn) {
+            gpsStatus.className = 'hint';
+            gpsStatus.textContent = 'Localisation en cours…';
+            btn.disabled = true;
+            try {
+              const position = await getCurrentPositionOnce({ enableHighAccuracy: true });
+              shot[field] = position;
+              if (shot.startPosition && shot.endPosition) {
+                shot.distance = Math.round(haversineDistance(shot.startPosition, shot.endPosition));
+              }
+              await persist();
+              renderShots();
+            } catch (err) {
+              gpsStatus.className = 'error-msg';
+              gpsStatus.textContent = err.message;
+              btn.disabled = false;
+            }
+          }
+
+          const startBtn = document.createElement('button');
+          startBtn.type = 'button';
+          startBtn.className = 'btn-secondary';
+          if (shot.startPosition) startBtn.appendChild(createIcon('check', { size: 16 }));
+          startBtn.appendChild(document.createTextNode('Départ'));
+          startBtn.addEventListener('click', () => capturePosition('startPosition', startBtn));
+
+          const endBtn = document.createElement('button');
+          endBtn.type = 'button';
+          endBtn.className = 'btn-secondary';
+          if (shot.endPosition) endBtn.appendChild(createIcon('check', { size: 16 }));
+          endBtn.appendChild(document.createTextNode('Arrivée'));
+          endBtn.addEventListener('click', () => capturePosition('endPosition', endBtn));
+
+          gpsRow.appendChild(startBtn);
+          gpsRow.appendChild(endBtn);
+          card.appendChild(gpsRow);
+          card.appendChild(gpsStatus);
+
           const lieField = document.createElement('div');
           lieField.className = 'shot-subfield';
           const lieLabel = document.createElement('span');
           lieLabel.className = 'hint';
-          lieLabel.textContent = 'Lie';
+          lieLabel.textContent = 'Lie arrivée';
           lieField.appendChild(lieLabel);
           lieField.appendChild(createButtonGroup(LIE_OPTIONS, shot.lie ?? null, async (value) => {
             shot.lie = value;
@@ -269,34 +336,36 @@ export async function renderPlay(container, params, navigate) {
           }));
           card.appendChild(shapeField);
 
+          const contactField = document.createElement('div');
+          contactField.className = 'shot-subfield';
+          const contactLabel = document.createElement('span');
+          contactLabel.className = 'hint';
+          contactLabel.textContent = 'Contact';
+          contactField.appendChild(contactLabel);
+          contactField.appendChild(createButtonGroup(CONTACT_OPTIONS, shot.contact ?? null, async (value) => {
+            shot.contact = value;
+            await persist();
+          }));
+          card.appendChild(contactField);
+
           shotsList.appendChild(card);
         });
       }
 
-      // Chaînage des positions : le premier coup part de la position calibrée du départ
-      // joué (plus fiable qu'un ping live, l'utilisateur étant exactement sur le repère).
-      // Pour les coups suivants, un ping ponctuel sert à la fois de endPosition du coup
-      // précédent (et donc de calcul de sa distance, uniquement si ce coup précédent était
-      // un coup plein) et de startPosition du nouveau coup. Une géolocalisation refusée ou en
-      // échec ne bloque jamais la saisie — le coup est ajouté sans position, sans distance.
+      // Premier coup d'un trou : startPosition préemplie avec le départ calibré du round
+      // (Hole.teePositions[teeColor]) — l'utilisateur peut toujours appuyer sur "Départ"
+      // pour forcer un ping live. Coups suivants : startPosition préemplie avec
+      // l'endPosition du coup précédent si elle est déjà renseignée, sinon laissée vide
+      // (aucun ping GPS n'est déclenché ici — seuls les boutons Départ/Arrivée de chaque
+      // coup en déclenchent un).
       addShotBtn.addEventListener('click', async () => {
-        let startPosition = null;
         const isFirstShot = holeScore.shots.length === 0;
-
+        let startPosition = null;
         if (isFirstShot) {
           startPosition = hole.teePositions?.[round.teeColor] ?? null;
         } else {
-          try {
-            const position = await getCurrentPositionOnce();
-            const previousShot = holeScore.shots[holeScore.shots.length - 1];
-            previousShot.endPosition = position;
-            if (previousShot.isFullShot && previousShot.startPosition) {
-              previousShot.distance = Math.round(haversineDistance(previousShot.startPosition, position));
-            }
-            startPosition = position;
-          } catch {
-            startPosition = null;
-          }
+          const previousShot = holeScore.shots[holeScore.shots.length - 1];
+          startPosition = previousShot.endPosition ? { ...previousShot.endPosition } : null;
         }
 
         holeScore.shots.push({
@@ -307,6 +376,7 @@ export async function renderPlay(container, params, navigate) {
           distance: null,
           lie: null,
           shape: null,
+          contact: null,
         });
         await persist();
         renderShots();

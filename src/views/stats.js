@@ -1,27 +1,63 @@
-// Écran Statistiques : moyenne de putts globale, deux graphiques (putting, score
-// stableford ramené à 18 trous), un tableau de distance moyenne par club, et une analyse
-// lie/style de coup. Filtres Golf/Année/Mois en haut de l'écran (s'appliquent à tout) ;
-// le filtre Club est positionné plus bas, juste au-dessus des deux seules sections qu'il
-// affecte réellement (`filterBar.clubFilterElement`, retourné séparément par
-// `src/ui/filters.js` pour ne pas être rendu avec le reste de la barre de filtres) :
-//   - Moyenne de putts + graphiques : Golf/Année/Mois uniquement (le filtre Club n'a pas de
-//     sens à l'échelle d'un round entier ; les lignes objectif restent affichées quel que
-//     soit le filtre).
-//   - Distance par club et analyse lie/style : Golf/Année/Mois + Club.
+// Écran Statistiques : moyenne de putts globale, % en régulation sur green (GIR), deux
+// graphiques (putting, score stableford ramené à 18 trous), un graphique à barres de
+// distribution des scores par rapport au par, un tableau de distance moyenne par club, et
+// des analyses lie/style/contact de coup. Filtres Golf/Année/Mois en haut de l'écran
+// (s'appliquent à tout) ; le filtre Club est positionné plus bas, juste au-dessus des
+// seules sections qu'il affecte réellement (`filterBar.clubFilterElement`, retourné
+// séparément par `src/ui/filters.js` pour ne pas être rendu avec le reste de la barre de
+// filtres) :
+//   - Moyenne de putts, % GIR, les deux graphiques et la distribution des scores :
+//     Golf/Année/Mois uniquement (rien de tout ça n'est rattaché à un club unique ; les
+//     lignes objectif restent affichées quel que soit le filtre).
+//   - Distance par club et analyses lie/style/contact : Golf/Année/Mois + Club.
+// % GIR et Contact n'apparaissent que si au moins une donnée correspondante a déjà été
+// renseignée (même règle que lie/style, déjà en place).
 // En mode Simplifié, seules les statistiques score/putts restent affichées (pas de filtre
 // Club, les sections club/coup étant elles-mêmes masquées).
 
 import { getRounds, getClubs, getCourses, getPlayer } from '../db/repository.js';
 import { buildLineChart } from '../ui/lineChart.js';
+import { buildBarChart } from '../ui/barChart.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
-import { LIE_OPTIONS, SHAPE_OPTIONS } from '../data/shotOptions.js';
+import { LIE_OPTIONS, SHAPE_OPTIONS, CONTACT_OPTIONS } from '../data/shotOptions.js';
 
 const STATS_HELP_TEXT = [
   'Les filtres Golf/Année/Mois/Club en haut de l\'écran sont partagés par toutes les sections ci-dessous, mais chacune n\'applique que les filtres qui la concernent.',
-  'La moyenne de putts et les deux graphiques ignorent le filtre Club (un round entier n\'a pas de club associé) ; les lignes pointillées sont vos objectifs (2 putts/trou, 36 points).',
-  'Le tableau de distance et l\'analyse lie/style tiennent compte de tous les filtres, y compris Club.',
+  'La moyenne de putts, le % en régulation sur green, les deux graphiques et la distribution des scores ignorent le filtre Club (aucun de ces éléments n\'est rattaché à un club unique) ; les lignes pointillées sont vos objectifs (2 putts/trou, 36 points).',
+  'Le tableau de distance et les analyses lie/style/contact tiennent compte de tous les filtres, y compris Club.',
+  'Ces sections (contact, % GIR, distribution des scores) n\'apparaissent que si vous avez déjà renseigné au moins une donnée correspondante.',
 ];
+
+// --- Distribution des scores par rapport au par ---
+
+const SCORE_DISTRIBUTION_CATEGORIES = [
+  { label: 'Eagle', test: (d) => d <= -2 },
+  { label: 'Birdie', test: (d) => d === -1 },
+  { label: 'Par', test: (d) => d === 0 },
+  { label: 'Bogey', test: (d) => d === 1 },
+  { label: 'Double', test: (d) => d === 2 },
+  { label: 'Triple ou plus', test: (d) => d >= 3 },
+];
+
+// Un trou "abandoned" a un écart forfaitaire de +3 (cf. play.js), donc tombe déjà
+// naturellement dans "Triple ou plus" via la même formule écart = brut - par.
+function computeScoreDistribution(completedRounds, courseById) {
+  const counts = SCORE_DISTRIBUTION_CATEGORIES.map(() => 0);
+  completedRounds.forEach((round) => {
+    const course = courseById.get(round.courseId);
+    if (!course) return;
+    round.holeScores.forEach((hs) => {
+      if (hs.status !== 'played' && hs.status !== 'abandoned') return;
+      const hole = course.holes.find((h) => h.number === hs.holeNumber);
+      if (!hole) return;
+      const diff = hs.grossScore - hole.par;
+      const idx = SCORE_DISTRIBUTION_CATEGORIES.findIndex((c) => c.test(diff));
+      if (idx >= 0) counts[idx] += 1;
+    });
+  });
+  return SCORE_DISTRIBUTION_CATEGORIES.map((c, i) => ({ label: c.label, value: counts[i] }));
+}
 
 function formatShortDate(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -197,9 +233,36 @@ function buildLieShapeSection(filteredRounds, clubs, clubFilterId, hasAnyLieOrSh
   return section;
 }
 
+// --- Contact ---
+
+// hasAnyContactEver : même règle que hasAnyLieOrShapeEver — section absente tant que le
+// champ n'a jamais été renseigné, même filtres (Golf/Année/Mois/Club) que lie/style.
+function buildContactSection(filteredRounds, clubFilterId, hasAnyContactEver) {
+  if (!hasAnyContactEver) return null;
+
+  let shots = collectShotsWithRound(filteredRounds).map((item) => item.shot);
+  if (clubFilterId) shots = shots.filter((s) => s.clubId === clubFilterId);
+
+  const section = document.createElement('div');
+  const title = document.createElement('h2');
+  title.textContent = 'Contact';
+  section.appendChild(title);
+
+  const table = distributionTable(shots, 'contact', CONTACT_OPTIONS, 'Contact');
+  if (!table) {
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'Aucun coup avec contact renseigné pour ces filtres.';
+    section.appendChild(hint);
+    return section;
+  }
+  section.appendChild(wrapScroll(table));
+  return section;
+}
+
 // --- Rendu ---
 
-function renderFilteredContent(container, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver, clubFilterElement) {
+function renderFilteredContent(container, allRounds, clubs, courseById, isSimplified, filters, hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, clubFilterElement) {
   const roundsMatchingFilters = allRounds.filter((r) => roundMatchesFilters(r, filters));
 
   const completedRounds = roundsMatchingFilters
@@ -215,6 +278,7 @@ function renderFilteredContent(container, allRounds, clubs, isSimplified, filter
   } else {
     let totalPuttsAll = 0;
     let totalPlayedHolesAll = 0;
+    let totalGirHits = 0;
     const puttsPoints = [];
     const stableford18Points = [];
 
@@ -226,6 +290,7 @@ function renderFilteredContent(container, allRounds, clubs, isSimplified, filter
       const roundPutts = playedHoles.reduce((s, h) => s + (h.putts ?? 0), 0);
       totalPuttsAll += roundPutts;
       totalPlayedHolesAll += playedHoles.length;
+      totalGirHits += playedHoles.filter((h) => h.girHit === true).length;
       if (playedHoles.length > 0) {
         puttsPoints.push({ label, value: Number((roundPutts / playedHoles.length).toFixed(2)) });
       }
@@ -244,6 +309,14 @@ function renderFilteredContent(container, allRounds, clubs, isSimplified, filter
     summary.textContent = `Moyenne de putts (parties filtrées) : ${globalAvgPutts}`;
     container.appendChild(summary);
 
+    if (hasAnyGirEver) {
+      const girPct = totalPlayedHolesAll > 0 ? Math.round((totalGirHits / totalPlayedHolesAll) * 100) : null;
+      const girSummary = document.createElement('p');
+      girSummary.className = 'hint';
+      girSummary.textContent = `En régulation sur green (parties filtrées) : ${girPct != null ? `${girPct}%` : '—'}`;
+      container.appendChild(girSummary);
+    }
+
     const puttsTitle = document.createElement('h2');
     puttsTitle.textContent = 'Putting — moyenne par partie';
     container.appendChild(puttsTitle);
@@ -253,6 +326,11 @@ function renderFilteredContent(container, allRounds, clubs, isSimplified, filter
     stablefordTitle.textContent = 'Score stableford — ramené à 18 trous';
     container.appendChild(stablefordTitle);
     container.appendChild(buildLineChart(stableford18Points, { target: 36, targetLabel: 'Objectif : 36 pts' }));
+
+    const distributionTitle = document.createElement('h2');
+    distributionTitle.textContent = 'Distribution des scores par rapport au par';
+    container.appendChild(distributionTitle);
+    container.appendChild(buildBarChart(computeScoreDistribution(completedRounds, courseById)));
   }
 
   if (!isSimplified) {
@@ -260,6 +338,8 @@ function renderFilteredContent(container, allRounds, clubs, isSimplified, filter
     container.appendChild(buildClubDistanceSection(computeClubDistanceStats(roundsMatchingFilters, clubs, filters.clubId)));
     const lieShapeSection = buildLieShapeSection(roundsMatchingFilters, clubs, filters.clubId, hasAnyLieOrShapeEver);
     if (lieShapeSection) container.appendChild(lieShapeSection);
+    const contactSection = buildContactSection(roundsMatchingFilters, filters.clubId, hasAnyContactEver);
+    if (contactSection) container.appendChild(contactSection);
   }
 }
 
@@ -273,7 +353,10 @@ export async function renderStats(container) {
     getRounds(), getClubs(), getCourses(), getPlayer(),
   ]);
   const isSimplified = player?.appMode === 'simplified';
+  const courseById = new Map(courses.map((c) => [c.id, c]));
   const hasAnyLieOrShapeEver = collectShotsWithRound(allRounds).some((item) => item.shot.lie || item.shot.shape);
+  const hasAnyContactEver = collectShotsWithRound(allRounds).some((item) => item.shot.contact);
+  const hasAnyGirEver = allRounds.some((r) => r.holeScores.some((hs) => hs.girHit === true));
 
   const filterBar = buildFilterBar({ courses, clubs: isSimplified ? null : clubs }, refresh);
   container.appendChild(filterBar.element);
@@ -284,7 +367,10 @@ export async function renderStats(container) {
   function refresh() {
     const filters = filterBar.getFilters();
     content.innerHTML = '';
-    renderFilteredContent(content, allRounds, clubs, isSimplified, filters, hasAnyLieOrShapeEver, filterBar.clubFilterElement);
+    renderFilteredContent(
+      content, allRounds, clubs, courseById, isSimplified, filters,
+      hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, filterBar.clubFilterElement
+    );
   }
 
   refresh();

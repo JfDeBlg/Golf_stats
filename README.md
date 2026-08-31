@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.53** (voir `src/version.js`).
+Version actuelle : **1.2.54** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -24,7 +24,10 @@ Version actuelle : **1.2.53** (voir `src/version.js`).
 - **Couleurs toujours via les variables de thème** (`:root` dans `style.css`), jamais une
   couleur figée (`#fff`, `#eee`, etc.) à côté d'une couleur qui suit déjà le thème — sinon
   texte et fond peuvent diverger et devenir illisibles en thème sombre (bug rencontré et
-  corrigé en 1.2.52 sur `.btn-secondary` et les états `:active` de plusieurs listes).
+  corrigé en 1.2.52 sur `.btn-secondary` et les états `:active` de plusieurs listes, puis en
+  1.2.54 sur `--color-primary` utilisée comme couleur de *texte* — courbes/points des
+  graphiques, aperçus, messages de succès — jamais redéfinie en thème sombre et donc quasi
+  invisible sur fond presque noir ; remplacée par `--color-accent-text`, adaptée par thème).
 
 ## Lancer en local
 
@@ -97,7 +100,9 @@ src/
 
   data/
     standardClubs.js          Liste standard de clubs suggérée dans Réglages
-    shotOptions.js             Options de lie et de style de coup
+    shotOptions.js             Options de lie arrivée (7, dont Green/Avant-green/
+                                Out-Perdue), de style de coup (10, dont Topée/Air shot/
+                                Socket) et de contact (Bon/Moyen/Mauvais)
 
   ui/
     formHelpers.js             createField (champ label+input), createButtonGroup
@@ -112,6 +117,8 @@ src/
                                   positionner ailleurs dans l'écran (cf. Statistiques)
     icons.js                    Construit un <svg> DOM à partir du set d'icônes inline
     lineChart.js                Mini-graphique en ligne SVG (sans dépendance externe)
+    barChart.js                  Mini-graphique à barres SVG (distribution des scores par
+                                  rapport au par, Statistiques)
     helpOverlay.js               createHelpButton(texte) : bouton "?" réutilisable ouvrant
                                   une bulle d'aide plein écran (fermeture par croix, clic
                                   extérieur ou Échap) ; superposée en dehors du routeur, donc
@@ -166,16 +173,26 @@ src/
     roundNew.js                      Démarrage d'une partie (golf, départ, météo, GPS) ;
                                        bouton d'aide
     play.js                           Écran de jeu : un trou à la fois, navigation
-                                       circulaire, score/putts/coups, statut de trou
+                                       circulaire, score/putts/coups, statut de trou. En-tête
+                                       ("Trou n - Par n - distance en m") toujours visible
+                                       pendant le défilement (sticky) ; case "En régulation
+                                       sur green" (GIR) sous Putts ; par coup, boutons GPS
+                                       explicites Départ/Arrivée (ping ponctuel haute
+                                       précision chacun), distance calculée et affichée dès
+                                       que les deux sont connues — Départ préempli depuis le
+                                       départ calibré (1er coup) ou l'Arrivée du coup
+                                       précédent (coups suivants), toujours ré-pingable ;
+                                       bouton d'aide
     scorecard.js                      Carte de score (lecture seule / mode édition)
     history.js                        Historique des parties terminées, même tableau (Écart
                                        au par signé) et même normalisation à 18 trous que
                                        Reprendre une partie, filtrable (Golf/Année/Mois)
-    stats.js                          Statistiques (putts, stableford, distance par club,
-                                       analyse lie/style) ; filtres Golf/Année/Mois en haut
-                                       (s'appliquent à tout), filtre Club positionné sous les
-                                       deux graphiques, juste au-dessus des sections qu'il
-                                       affecte réellement ; bouton d'aide
+    stats.js                          Statistiques (putts, % GIR, stableford, distribution
+                                       des scores par rapport au par, distance par club,
+                                       analyses lie/style/contact) ; filtres Golf/Année/Mois
+                                       en haut (s'appliquent à tout), filtre Club positionné
+                                       sous les deux graphiques, juste au-dessus des sections
+                                       qu'il affecte réellement ; bouton d'aide
 ```
 
 ## Modèle de données (IndexedDB)
@@ -190,9 +207,11 @@ src/
 - **Round** : `id`, `date`, `courseId`, `teeColor`, `handicapIndexAtPlay`, `courseHandicap`,
   `startHole`, `status` (`"in_progress" | "completed"`), `weather`, `holeScores[]`
 - **HoleScore** : `holeNumber`, `status` (`"not_played" | "played" | "abandoned"`),
-  `grossScore`, `putts`, `stablefordNetPoints`, `shots[]`
-- **Shot** : `clubId`, `isFullShot`, `startPosition`, `endPosition`, `distance`, `lie`,
-  `shape`
+  `grossScore`, `putts`, `girHit` (booléen, régulation sur green — saisie manuelle, défaut
+  `false`, sans calcul automatique), `stablefordNetPoints`, `shots[]`
+- **Shot** : `clubId`, `isFullShot`, `startPosition`, `endPosition`, `distance`, `lie`
+  (7 valeurs, dont Green/Avant-green/Out-Perdue), `shape` (10 valeurs, dont Topée/Air
+  shot/Socket), `contact` (Bon/Moyen/Mauvais ou `null`)
 
 `Course.source` ne bascule vers `"calibrated"` que via une calibration manuelle sur place
 qui complète les 18 trous ; un préremplissage OpenStreetMap marque `"osm_prefilled"` et ne
@@ -202,6 +221,12 @@ devient jamais `"calibrated"` de lui-même.
 1.2.51 (la localisation vient désormais uniquement de la calibration GPS/OpenStreetMap) ;
 le champ reste dans le modèle de données pour compatibilité et sert encore de préremplissage
 optionnel du champ de recherche OSM en calibration quand il est déjà renseigné.
+
+Depuis la 1.2.54, `Shot.startPosition`/`endPosition` ne sont plus chaînés implicitement par
+"Ajouter un coup" (comportement du Lot 2) : chaque coup a ses propres boutons Départ/Arrivée
+dans `play.js`, chacun déclenchant son propre ping GPS ponctuel. "Ajouter un coup" se
+contente de préremplir `startPosition` (départ calibré pour le 1er coup du trou, sinon
+`endPosition` du coup précédent si déjà renseignée) — sans jamais géolocaliser lui-même.
 
 ## Historique des versions
 
@@ -220,6 +245,7 @@ optionnel du champ de recherche OSM en calibration quand il est déjà renseign�
 | 1.2.51 | Reprendre une partie et Historique : en-têtes "Score brut"/"Stableford net" sur 2 lignes pour élargir la colonne Golf ; Statistiques : filtre Club déplacé sous les deux graphiques, juste au-dessus des sections qu'il affecte (`filterBar.clubFilterElement` retourné séparément par `src/ui/filters.js`) ; casse d'affichage des noms de golf harmonisée partout via une fonction unique (`formatGolfName`, `src/ui/formHelpers.js`) au lieu d'être limitée à Gestion parcours ; formulaire de golf (Nouveau parcours/Modifier parcours/Import PDF) : suppression du champ Lieu (localisation désormais uniquement via calibration GPS/OSM), "Couleur de départ jouée" en liste déroulante (Noir/Blanc/Jaune/Bleu/Rouge/Orange/Violet), colonne par-trou renommée "Index (SI)" -> "Handicap", bouton d'aide expliquant Slope/SSS/Handicap ; icône satellite agrandie pour "Calibrer avec le GPS" dans Gestion parcours ; Réglages : bouton "Télécharger (ZIP)" ajouté à côté de "Exporter et partager" pour un téléchargement direct sans passer par la feuille de partage (utile sur ordinateur) |
 | 1.2.52 | Reprendre une partie et Historique : colonne "Score brut" remplacée par "Écart" (écart signé au par, ramené à 18 trous par règle de trois, ex: "+20"/"-2"/"0") — même formatage (`formatToPar`) que celui déjà utilisé par la Carte de score, désormais factorisé dans `src/scoring/roundSummary.js` ; icône satellite remplacée par le tracé officiel Tabler `ti-satellite` (silhouette de satellite classique) dans `src/icons/icons.js` ; **correctif de contraste** : `.btn-secondary` utilisait un fond gris clair figé (`#e9e9e3`) alors que son texte suit le thème — illisible (texte clair sur fond clair) une fois le thème sombre actif ; même bug corrigé sur les états `:active` de `.menu-item`/`.menu-dropdown-item`/lignes de tableau cliquables (`#eee` figé) ; tous remplacés par une variable de thème dédiée (`--color-secondary-bg`, adaptée par thème) — convention documentée directement dans `style.css` ; Réglages : la fonction d'import est désormais entourée d'un encadré distinct (`.import-box`) avec un texte d'orientation selon l'appareil (app Fichiers/Google Drive/dossier Téléchargements) |
 | 1.2.53 | Réglages, section "Sauvegarde / Partage" : le bloc unique à 3 boutons devient 3 encadrés séparés (`.action-box`, ex-`.import-box` généralisée), chacun avec sa propre phrase d'explication sous le bouton (Exporter et partager / Télécharger en ZIP / Importer) — ajustement de présentation uniquement, le mécanisme d'export/import est inchangé |
+| 1.2.54 | **Contraste thème sombre** : graphiques Statistiques (courbe, points, chiffres d'axe) et aperçus (dont la distance au green) utilisaient `--color-primary` (vert très sombre, jamais redéfini en thème sombre) comme couleur de texte, quasi invisibles sur fond presque noir — remplacés par `--color-accent-text` (clair en thème sombre), lignes de référence "objectif" éclaircies (`--color-chart-target`) ; **écran de jeu** : en-tête ("Trou n - Par n - distance en m") rendu `sticky`, toujours visible pendant le défilement des coups ; **coups** : chaînage GPS implicite du Lot 2 remplacé par des boutons explicites Départ/Arrivée par coup (ping ponctuel haute précision chacun), distance calculée et affichée automatiquement dès que les deux sont connues, Départ préempli (départ calibré pour le 1er coup, Arrivée du coup précédent sinon) mais toujours ré-pingable ; champ Lie renommé "Lie arrivée" et étendu (+ Green, Avant-green, Out/Perdue) ; Style de coup étendu (+ Topée, Air shot, Socket) ; nouveau champ Contact (Bon/Moyen/Mauvais) ; nouvelle case "En régulation sur green" (GIR) au niveau du trou ; **Statistiques** : nouvelle section Contact, nouveau "% en régulation sur green", nouveau graphique en barres de distribution des scores par rapport au par (Eagle/Birdie/Par/Bogey/Double/Triple ou plus, `src/ui/barChart.js`) |
 
 ## Tenir ce README à jour
 

@@ -216,6 +216,7 @@ export async function renderRoundNew(container, params, navigate) {
         grossScore: null,
         putts: null,
         stablefordNetPoints: 0,
+        girHit: false,
         shots: [],
       })),
     };
