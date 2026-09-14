@@ -22,6 +22,10 @@
      illisibles). */
   --color-accent-text: var(--color-primary);
   --color-chart-target: #b45309;
+  /* Ligne de moyenne réelle des graphiques Statistiques : orange (v1.2.56, plus lisible que
+     le rouge d'origine sur fond sombre), volontairement distinct de --color-chart-target
+     (ambre) pour que les deux lignes de référence restent différentiables à l'oeil. */
+  --color-chart-average: #c2410c;
   --app-header-content-height: 2.25rem;
   --radius: 10px;
 }
@@ -258,6 +262,20 @@ body {
   min-width: 0;
 }
 
+/* Case à cocher + libellé sur une seule ligne (ex: "En régulation sur green"), à la
+   différence de createField qui empile libellé et champ sur deux lignes. */
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.checkbox-field input {
+  width: auto;
+}
+
 input,
 select {
   padding: 0.6rem;
@@ -423,12 +441,16 @@ select {
   font-size: 9px;
 }
 .chart-average-line {
-  stroke: var(--color-danger);
+  stroke: var(--color-chart-average);
   stroke-width: 1;
   stroke-dasharray: 2 2;
 }
 .chart-average-label {
-  fill: var(--color-danger);
+  fill: var(--color-chart-average);
+  font-size: 9px;
+}
+.chart-average-tick {
+  fill: var(--color-chart-average);
   font-size: 9px;
 }
 .putts-objective {
@@ -628,6 +650,7 @@ select {
     --color-secondary-bg: #32352e;
     --color-accent-text: var(--color-text);
     --color-chart-target: #fbbf24;
+    --color-chart-average: #fb923c;
   }
   input,
   select {

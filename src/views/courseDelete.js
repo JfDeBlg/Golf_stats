@@ -2,10 +2,10 @@
 
 import { getCourses, deleteCourse } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
-import { formatGolfName } from '../ui/formHelpers.js';
+import { formatGolfName, sortCoursesByName } from '../ui/formHelpers.js';
 
 export async function renderCourseDelete(container, params, navigate) {
-  const courses = await getCourses();
+  const courses = sortCoursesByName(await getCourses());
 
   if (courses.length === 0) {
     const empty = document.createElement('p');

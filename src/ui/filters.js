@@ -1,7 +1,7 @@
 // Barre de filtres réutilisable (Golf / Année / Mois, + Club en option) — partagée par
 // Reprendre une partie, Historique et Statistiques pour éviter toute réimplémentation.
 
-import { createField, formatGolfName } from './formHelpers.js';
+import { createField, formatGolfName, sortCoursesByName } from './formHelpers.js';
 
 // options: { courses: [...], clubs: [...] | null } — clubs=null n'affiche pas ce filtre
 // (Historique et Reprendre une partie n'ont pas de notion de club).
@@ -20,7 +20,7 @@ export function buildFilterBar(options, onChange) {
   allCoursesOpt.value = '';
   allCoursesOpt.textContent = 'Tous les golfs';
   courseFilter.appendChild(allCoursesOpt);
-  courses.forEach((c) => {
+  sortCoursesByName(courses).forEach((c) => {
     const opt = document.createElement('option');
     opt.value = c.id;
     opt.textContent = formatGolfName(c.name);

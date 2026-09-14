@@ -5,6 +5,12 @@
 // données), avec une marge d'environ 8 % de part et d'autre plutôt qu'un axe Y fixe partant
 // de 0 — nécessaire dès que les valeurs affichées ne sont plus proches de 0 (ex : total de
 // putts ramené à 18 trous, de l'ordre de 30-40).
+//
+// Graduations Y (depuis la 1.2.56) : min et max (déjà en place) + la valeur de la ligne de
+// moyenne si elle ne tombe pas trop près des deux autres — au plus 3 nombres affichés sur
+// l'axe, pour ne pas surcharger visuellement un graphique de cette taille. La ligne de
+// moyenne elle-même est orange (--color-chart-average, distinct de l'ambre de la ligne
+// objectif) plutôt que rouge, plus lisible sur fond sombre.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const AXIS_MARGIN_RATIO = 0.08;
@@ -127,6 +133,24 @@ export function buildLineChart(points, {
   minLabel.setAttribute('class', 'chart-axis-label');
   minLabel.textContent = minValue.toFixed(1);
   svg.appendChild(minLabel);
+
+  // Graduation numérique de la ligne de moyenne sur l'axe Y (même style que min/max
+  // ci-dessus), en plus de son étiquette textuelle près de la ligne elle-même — sans
+  // surcharger le graphique, on l'omet si elle tomberait trop près d'un des deux labels
+  // déjà posés aux bornes du graphique.
+  if (average != null) {
+    const averageY = yFor(average);
+    const tooCloseToMax = Math.abs(averageY - (padding.top + 4)) < 10;
+    const tooCloseToMin = Math.abs(averageY - (padding.top + plotHeight)) < 10;
+    if (!tooCloseToMax && !tooCloseToMin) {
+      const averageTick = document.createElementNS(SVG_NS, 'text');
+      averageTick.setAttribute('x', 2);
+      averageTick.setAttribute('y', averageY + 3);
+      averageTick.setAttribute('class', 'chart-average-tick');
+      averageTick.textContent = average.toFixed(1);
+      svg.appendChild(averageTick);
+    }
+  }
 
   const labelIndexes = points.length <= 6
     ? points.map((_, i) => i)

@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.55** (voir `src/version.js`).
+Version actuelle : **1.2.56** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -123,18 +123,28 @@ src/
                                 scoring/puttsObjective.js
 
   ui/
-    formHelpers.js             createField (champ label+input), createButtonGroup
-                                (sélection unique, ex: lie/style), formatGolfName (casse
-                                d'affichage uniforme d'un nom de golf, jamais appliquée aux
-                                noms d'origine externe déjà correctement casés comme les
-                                résultats OpenStreetMap)
+    formHelpers.js             createField (champ label+input), createInlineField (libellé en
+                                préfixe dans le même cadre), createCheckboxField (case à cocher
+                                + libellé sur une seule ligne), createButtonGroup (sélection
+                                unique, ex: lie/style), formatGolfName (casse d'affichage
+                                uniforme d'un nom de golf, jamais appliquée aux noms d'origine
+                                externe déjà correctement casés comme les résultats
+                                OpenStreetMap), sortCoursesByName (tri alphabétique insensible
+                                à la casse, seul point de vérité pour toutes les listes de
+                                golfs de l'app)
     filters.js                   Barre de filtres partagée (Golf/Année/Mois + Club en
-                                  option) — Reprendre une partie, Historique, Statistiques ;
+                                  option), liste de golfs triée via sortCoursesByName —
+                                  Reprendre une partie, Historique, Statistiques ;
                                   le champ Club, quand demandé, est renvoyé séparément
                                   (`clubFilterElement`) pour que l'appelant puisse le
                                   positionner ailleurs dans l'écran (cf. Statistiques)
     icons.js                    Construit un <svg> DOM à partir du set d'icônes inline
-    lineChart.js                Mini-graphique en ligne SVG (sans dépendance externe)
+    lineChart.js                Mini-graphique en ligne SVG (sans dépendance externe) ;
+                                  échelle adaptative (min/max des données + marge ~8 %),
+                                  ligne objectif (ambre) et ligne de moyenne réelle (orange,
+                                  --color-chart-average) ; graduations numériques sur l'axe Y
+                                  (min, max, + la valeur de la moyenne si elle ne chevauche
+                                  pas les deux autres — au plus 3 nombres affichés)
     barChart.js                  Mini-graphique à barres SVG (distribution des scores par
                                   rapport au par, Statistiques)
     helpOverlay.js               createHelpButton(texte) : bouton "?" réutilisable ouvrant
@@ -168,22 +178,25 @@ src/
                                    satellite classique agrandie pour Calibrer avec le GPS,
                                    inspirée de Tabler ti-satellite) + liste des golfs
                                    enregistrés, triée alphabétiquement (insensible à la
-                                   casse), noms affichés en casse phrase (formatGolfName),
-                                   bouton d'aide expliquant les icônes de statut de
-                                   calibration
+                                   casse) via sortCoursesByName, noms affichés en casse
+                                   phrase (formatGolfName), bouton d'aide expliquant les
+                                   icônes de statut de calibration
     courseNew.js                   Création manuelle d'un parcours
     courseImportPdf.js             Import PDF -> pré-remplissage du formulaire de création ;
                                     bouton d'aide + lien vers le générateur de carte de score
                                     en ligne ; pdf.js chargé paresseusement à l'usage
-    courseEdit.js                   Édition d'un parcours existant
-    courseDelete.js                 Suppression d'un parcours
+    courseEdit.js                   Édition d'un parcours existant ; liste de sélection
+                                    triée via sortCoursesByName (depuis la 1.2.56 — absent
+                                    par erreur jusque-là malgré la règle déjà posée en 1.2.51)
+    courseDelete.js                 Suppression d'un parcours ; même tri sortCoursesByName
     courseCalibrate.js              Calibration GPS trou par trou ; bouton d'aide ; amorce
                                     OpenStreetMap par lieu approximatif OU par lien
                                     OpenStreetMap direct (.../way/<id>), chacun avec sa
                                     propre gestion d'erreur indépendante ; green calibrable
                                     jusqu'à 3 points (entrée/milieu/sortie,
                                     Hole.greenPositions), seul le milieu est requis pour
-                                    marquer le trou comme calibré
+                                    marquer le trou comme calibré ; liste de golfs triée via
+                                    sortCoursesByName
     courseFormShared.js             Formulaire de golf partagé (création/import/édition) :
                                     pas de champ Lieu (localisation issue uniquement de la
                                     calibration GPS/OSM), couleur de départ en liste
@@ -196,14 +209,16 @@ src/
                                        les deux derniers ramenés à 18 trous par règle de
                                        trois (un tiret uniquement si aucun trou n'a de score)
     roundNew.js                      Démarrage d'une partie (golf, départ, météo, GPS) ;
-                                       bouton d'aide
+                                       liste de golfs triée via sortCoursesByName ; bouton
+                                       d'aide
     play.js                           Écran de jeu : un trou à la fois, navigation
                                        circulaire, score/putts/coups, statut de trou. En-tête
                                        ("Trou n - Par n - Hcp n - distance en m") toujours
                                        visible pendant le défilement (sticky) ; libellés
                                        "Score brut"/"Putts" en préfixe dans le cadre du champ
                                        (createInlineField) ; case "En régulation sur green"
-                                       (GIR) sous Putts ; barre Suivant/Précédent épinglée en
+                                       (GIR) sous Putts, case et libellé sur la même ligne
+                                       (createCheckboxField) ; barre Suivant/Précédent épinglée en
                                        bas d'écran (.hole-nav-fixed), bouton "remonter en
                                        haut" juste au-dessus ; "Distance au green" affiche les
                                        3 distances Entrée/Milieu/Sortie si calibrées, sinon
@@ -232,9 +247,11 @@ src/
                                        rapport au par, distance par club, analyses
                                        lie/style/contact ; les trois graphiques en ligne ont
                                        une échelle adaptative (marge ~8 % autour des données +
-                                       ligne objectif), une ligne rouge de moyenne réelle en
-                                       plus de la ligne orange d'objectif (sauf régulation sur
-                                       green, sans objectif) ; filtres Golf/Année/Mois en haut
+                                       ligne objectif), une ligne orange de moyenne réelle en
+                                       plus de la ligne ambre d'objectif (sauf régulation sur
+                                       green, sans objectif), et jusqu'à 3 graduations
+                                       numériques sur l'axe Y (min/max + valeur de la moyenne)
+                                       ; filtres Golf/Année/Mois en haut
                                        (s'appliquent à tout), filtre Club positionné sous les
                                        graphiques, juste au-dessus des sections qu'il affecte
                                        réellement ; bouton d'aide
@@ -305,6 +322,8 @@ s'importe donc sans erreur en 1.2.55.
 | 1.2.53 | Réglages, section "Sauvegarde / Partage" : le bloc unique à 3 boutons devient 3 encadrés séparés (`.action-box`, ex-`.import-box` généralisée), chacun avec sa propre phrase d'explication sous le bouton (Exporter et partager / Télécharger en ZIP / Importer) — ajustement de présentation uniquement, le mécanisme d'export/import est inchangé |
 | 1.2.54 | **Contraste thème sombre** : graphiques Statistiques (courbe, points, chiffres d'axe) et aperçus (dont la distance au green) utilisaient `--color-primary` (vert très sombre, jamais redéfini en thème sombre) comme couleur de texte, quasi invisibles sur fond presque noir — remplacés par `--color-accent-text` (clair en thème sombre), lignes de référence "objectif" éclaircies (`--color-chart-target`) ; **écran de jeu** : en-tête ("Trou n - Par n - distance en m") rendu `sticky`, toujours visible pendant le défilement des coups ; **coups** : chaînage GPS implicite du Lot 2 remplacé par des boutons explicites Départ/Arrivée par coup (ping ponctuel haute précision chacun), distance calculée et affichée automatiquement dès que les deux sont connues, Départ préempli (départ calibré pour le 1er coup, Arrivée du coup précédent sinon) mais toujours ré-pingable ; champ Lie renommé "Lie arrivée" et étendu (+ Green, Avant-green, Out/Perdue) ; Style de coup étendu (+ Topée, Air shot, Socket) ; nouveau champ Contact (Bon/Moyen/Mauvais) ; nouvelle case "En régulation sur green" (GIR) au niveau du trou ; **Statistiques** : nouvelle section Contact, nouveau "% en régulation sur green", nouveau graphique en barres de distribution des scores par rapport au par (Eagle/Birdie/Par/Bogey/Double/Triple ou plus, `src/ui/barChart.js`) |
 | 1.2.55 | **Rappel de sauvegarde** : bandeau non bloquant (`src/ui/toast.js`) après création/modification de parcours et clôture de partie, avec raccourci direct vers l'export existant (pas de sauvegarde silencieuse possible sur iPhone) ; **mode Simplifié** : Carte de score identique au mode Expert (Trou/Par/Score/Écart/Pts/Putts, plus de tableau réduit) — la différence entre modes reste uniquement dans l'écran de jeu ; **graphiques Statistiques** : échelle adaptative (min/max des données + marge ~8 %) sur Putting/Stableford/nouveau graphique Régulation sur green, ligne rouge de moyenne réelle en plus de la ligne orange d'objectif ; métrique Putting remplacée par le total de putts ramené à 18 trous ; nouvel **objectif de putts personnalisé** par index de handicap (interpolation linéaire dans une table de référence, `src/data/puttsObjectiveTable.js` + `src/scoring/puttsObjective.js`), affiché en Statistiques avant le graphique Putting et utilisé comme ligne objectif ; **écran de jeu** : en-tête enrichi (`Trou n - Par n - Hcp n - distance`), barre Suivant/Précédent épinglée en bas d'écran + bouton "remonter en haut", libellés "Score brut"/"Putts" en préfixe du champ (`createInlineField`), coordonnées GPS brutes (+ précision) affichées sous les boutons Départ/Arrivée de chaque coup ; **green multi-points** : jusqu'à 3 repères par trou (Entrée/Milieu/Sortie, `Hole.greenPositions`, migration transparente depuis l'ancien `Hole.greenPosition`), "Distance au green" affiche les 3 distances si calibrées ; **Carte de score** : bouton "Export partie" (PDF via jsPDF vendoré, partagé/téléchargé comme l'export ZIP) |
+
+| 1.2.56 | **Audit tri/casse des listes de golfs** : la règle posée en 1.2.51 (tri alphabétique insensible à la casse + casse phrase, partout) n'était en réalité appliquée qu'à Gestion parcours — `sortCoursesByName` (`src/ui/formHelpers.js`) créé comme seul point de vérité et appliqué aussi à Modifier parcours, Supprimer parcours, Calibration GPS, Nouvelle partie et au filtre Golf partagé (`src/ui/filters.js`, Reprendre une partie/Historique/Statistiques) ; **graphiques Statistiques** : jusqu'à 3 graduations numériques sur l'axe Y (min, max, + valeur de la moyenne si elle ne chevauche pas les deux autres), ligne de moyenne recolorée en orange (`--color-chart-average`) au lieu de rouge, volontairement distincte de l'ambre déjà utilisé par la ligne objectif ; **écran de jeu** : case "En régulation sur green" et son libellé alignés sur une seule ligne (`createCheckboxField`, `src/ui/formHelpers.js`) au lieu d'être empilés |
 
 ## Tenir ce README à jour
 

@@ -89,16 +89,19 @@ Layer boundaries:
 - `src/lib/` — vendored third-party code only: pdf.js/pdf.worker.js (legacy build),
   jszip.min.js and jspdf.umd.min.js (UMD builds, each injected via a `<script>` tag on
   demand, never at startup).
-- `src/ui/` — shared, dependency-free UI building blocks: form helpers incl. `formatGolfName`
-  and `createInlineField` ([formHelpers.js](src/ui/formHelpers.js)), the shared
-  Golf/Year/Month(/Club) filter bar ([filters.js](src/ui/filters.js)), inline-SVG icon builder
-  ([icons.js](src/ui/icons.js)), line/bar chart SVG components with no external dependency —
-  adaptive axis scale, target and average reference lines
-  ([lineChart.js](src/ui/lineChart.js), [barChart.js](src/ui/barChart.js)), the reusable "?"
-  help bubble ([helpOverlay.js](src/ui/helpOverlay.js), overlaid outside the router so closing
-  it never touches navigation history), and the non-blocking save-reminder banner
-  (`showSaveReminderToast`, [toast.js](src/ui/toast.js), shown after course create/edit and
-  round completion — no silent background save is possible on iPhone).
+- `src/ui/` — shared, dependency-free UI building blocks: form helpers incl. `formatGolfName`,
+  `createInlineField`, `createCheckboxField` and `sortCoursesByName` — the single sort used by
+  every golf list in the app (course management/edit/delete/calibrate, round creation, the
+  shared Golf filter) — in [formHelpers.js](src/ui/formHelpers.js); the shared
+  Golf/Year/Month(/Club) filter bar ([filters.js](src/ui/filters.js)); inline-SVG icon builder
+  ([icons.js](src/ui/icons.js)); line/bar chart SVG components with no external dependency —
+  adaptive axis scale, an amber target line and an orange average line each with their own Y-axis
+  tick, `--color-chart-target` and `--color-chart-average` kept deliberately distinct so the two
+  never blend together ([lineChart.js](src/ui/lineChart.js), [barChart.js](src/ui/barChart.js));
+  the reusable "?" help bubble ([helpOverlay.js](src/ui/helpOverlay.js), overlaid outside the
+  router so closing it never touches navigation history); and the non-blocking save-reminder
+  banner (`showSaveReminderToast`, [toast.js](src/ui/toast.js), shown after course create/edit
+  and round completion — no silent background save is possible on iPhone).
 
 ## Data model (IndexedDB)
 

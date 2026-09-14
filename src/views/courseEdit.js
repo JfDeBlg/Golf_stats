@@ -8,7 +8,7 @@
 import { getCourses, saveCourse } from '../db/repository.js';
 import { buildCourseForm } from './courseFormShared.js';
 import { deriveCourseSource } from '../scoring/calibration.js';
-import { formatGolfName } from '../ui/formHelpers.js';
+import { formatGolfName, sortCoursesByName } from '../ui/formHelpers.js';
 import { showSaveReminderToast } from '../ui/toast.js';
 
 function mergeTees(existingTees, newTee) {
@@ -23,7 +23,7 @@ function mergeTees(existingTees, newTee) {
 }
 
 export async function renderCourseEdit(container, params, navigate) {
-  const courses = await getCourses();
+  const courses = sortCoursesByName(await getCourses());
 
   if (courses.length === 0) {
     const empty = document.createElement('p');

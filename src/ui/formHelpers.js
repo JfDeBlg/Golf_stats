@@ -9,6 +9,15 @@ export function formatGolfName(name) {
   return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
+// Tri alphabétique insensible à la casse, partagé par toutes les listes de golfs de l'app
+// (Gestion parcours, Modifier/Supprimer parcours, Calibration GPS, Nouvelle partie, filtre
+// Golf de Reprendre une partie/Historique/Statistiques) — un seul point de vérité, pour
+// qu'aucun de ces écrans ne diverge du tri déjà en place ailleurs. Ne mute jamais le tableau
+// reçu (les appelants peuvent le réutiliser ensuite, ex: recherche par id).
+export function sortCoursesByName(courses) {
+  return [...courses].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
 let fieldCounter = 0;
 
 export function createField(labelText, inputEl) {
@@ -25,6 +34,16 @@ export function createField(labelText, inputEl) {
 
   wrapper.appendChild(label);
   wrapper.appendChild(inputEl);
+  return wrapper;
+}
+
+// Case à cocher + libellé sur une seule ligne (à la différence de createField, qui empile
+// libellé et champ) — association implicite via le <label> englobant, pas de for/id requis.
+export function createCheckboxField(labelText, inputEl) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'checkbox-field';
+  wrapper.appendChild(inputEl);
+  wrapper.appendChild(document.createTextNode(labelText));
   return wrapper;
 }
 

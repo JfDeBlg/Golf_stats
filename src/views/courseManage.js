@@ -8,7 +8,7 @@
 import { getCourses, deleteCourse } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
-import { formatGolfName } from '../ui/formHelpers.js';
+import { formatGolfName, sortCoursesByName } from '../ui/formHelpers.js';
 
 const ITEM_ICON_SIZE = 20;
 
@@ -55,8 +55,7 @@ export async function renderCourseManage(container, params, navigate) {
   container.appendChild(list);
 
   async function refresh() {
-    const courses = (await getCourses())
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const courses = sortCoursesByName(await getCourses());
     list.innerHTML = '';
 
     if (courses.length === 0) {

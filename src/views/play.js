@@ -10,7 +10,7 @@ import { getRound, getCourse, saveRound, getClubs, getPlayer } from '../db/repos
 import { computeNetStablefordPoints } from '../scoring/stableford.js';
 import { haversineDistance } from '../scoring/distance.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
-import { createField, createInlineField, createButtonGroup } from '../ui/formHelpers.js';
+import { createInlineField, createCheckboxField, createButtonGroup } from '../ui/formHelpers.js';
 import { createIcon } from '../ui/icons.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
 import { showSaveReminderToast } from '../ui/toast.js';
@@ -156,7 +156,7 @@ export async function renderPlay(container, params, navigate) {
     const girInput = document.createElement('input');
     girInput.type = 'checkbox';
     girInput.checked = holeScore.girHit === true;
-    form.appendChild(createField('En régulation sur green', girInput));
+    form.appendChild(createCheckboxField('En régulation sur green', girInput));
     girInput.addEventListener('change', async () => {
       holeScore.girHit = girInput.checked;
       await persist();

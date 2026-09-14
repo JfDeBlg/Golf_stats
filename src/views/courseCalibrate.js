@@ -15,7 +15,7 @@ import {
 } from '../geo/openStreetMap.js';
 import { deriveCourseSource, isCourseFullyCalibrated, getMiddleGreen } from '../scoring/calibration.js';
 import { createIcon } from '../ui/icons.js';
-import { createField, formatGolfName } from '../ui/formHelpers.js';
+import { createField, formatGolfName, sortCoursesByName } from '../ui/formHelpers.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
 
 const CALIBRATE_HELP_TEXT = [
@@ -49,7 +49,7 @@ export async function renderCourseCalibrate(container, params, navigate) {
   headerRow.appendChild(createHelpButton(CALIBRATE_HELP_TEXT));
   container.appendChild(headerRow);
 
-  const courses = await getCourses();
+  const courses = sortCoursesByName(await getCourses());
 
   if (courses.length === 0) {
     const empty = document.createElement('p');

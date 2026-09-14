@@ -6,7 +6,7 @@ import { computeCourseHandicap } from '../scoring/handicap.js';
 import { haversineDistance } from '../scoring/distance.js';
 import { computeCourseReferencePoint } from '../scoring/calibration.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
-import { createField, formatGolfName } from '../ui/formHelpers.js';
+import { createField, formatGolfName, sortCoursesByName } from '../ui/formHelpers.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
 
 const WIND_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
@@ -24,7 +24,7 @@ export async function renderRoundNew(container, params, navigate) {
   headerRow.appendChild(createHelpButton(ROUND_NEW_HELP_TEXT));
   container.appendChild(headerRow);
 
-  const courses = await getCourses();
+  const courses = sortCoursesByName(await getCourses());
   if (courses.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'hint';
