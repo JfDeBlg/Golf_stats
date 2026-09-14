@@ -80,6 +80,9 @@ function computeAverage(points) {
 // Moyenne de putts et % GIR globaux (parties filtrées) — extrait en fonction pure pour être
 // le seul point de calcul partagé entre l'affichage à l'écran et l'export PDF (éviter que les
 // deux divergent, comme c'était le cas avant correctif dans src/export/roundPdf.js).
+// avgPuttsPerHole (nombre brut, ou null) est en plus de globalAvgPutts (chaîne déjà arrondie,
+// utilisée telle quelle par l'écran) : l'export PDF en a besoin pour dériver le total ramené
+// à 18 trous (avgPuttsPerHole * 18), sur la même échelle que l'objectif personnalisé.
 function computeGlobalPuttsAndGir(completedRounds, hasAnyGirEver) {
   let totalPuttsAll = 0;
   let totalPlayedHolesAll = 0;
@@ -90,8 +93,10 @@ function computeGlobalPuttsAndGir(completedRounds, hasAnyGirEver) {
     totalPlayedHolesAll += playedHoles.length;
     totalGirHits += playedHoles.filter((h) => h.girHit === true).length;
   });
+  const avgPuttsPerHole = totalPlayedHolesAll > 0 ? totalPuttsAll / totalPlayedHolesAll : null;
   return {
-    globalAvgPutts: totalPlayedHolesAll > 0 ? (totalPuttsAll / totalPlayedHolesAll).toFixed(2) : null,
+    avgPuttsPerHole,
+    globalAvgPutts: avgPuttsPerHole != null ? avgPuttsPerHole.toFixed(2) : null,
     girPct: hasAnyGirEver && totalPlayedHolesAll > 0 ? Math.round((totalGirHits / totalPlayedHolesAll) * 100) : null,
   };
 }
@@ -458,7 +463,8 @@ function buildStatsExportSummary({
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 
   const puttsObjective = computePuttsObjective(player?.handicapIndex ?? 0);
-  const { globalAvgPutts, girPct } = computeGlobalPuttsAndGir(completedRounds, hasAnyGirEver);
+  const { globalAvgPutts, avgPuttsPerHole, girPct } = computeGlobalPuttsAndGir(completedRounds, hasAnyGirEver);
+  const realPutts18 = avgPuttsPerHole != null ? avgPuttsPerHole * 18 : null;
   const scoreDistribution = completedRounds.length > 0 ? computeScoreDistribution(completedRounds, courseById) : null;
 
   let clubDistanceStats = null;
@@ -497,6 +503,7 @@ function buildStatsExportSummary({
     hasCompletedRounds: completedRounds.length > 0,
     puttsObjective,
     globalAvgPutts,
+    realPutts18,
     hasAnyGirEver,
     girPct,
     scoreDistribution,

@@ -113,7 +113,10 @@ src/
                               valeurs chiffrées uniquement (pas de graphiques reproduits en
                               image), construites par buildStatsExportSummary
                               (src/views/stats.js) à partir des mêmes fonctions de calcul
-                              que l'écran, pour qu'export et affichage ne divergent jamais
+                              que l'écran, pour qu'export et affichage ne divergent jamais ;
+                              putts objectif et réel affichés sur les deux échelles (total/18
+                              trous ET moyenne/trou), ex: "Réel : 35,2 putts/18 trous
+                              (1,96/trou)"
 
   lib/
     pdf.js, pdf.worker.js     pdf.js (build legacy, vendoré) — extraction de texte PDF
@@ -343,7 +346,7 @@ s'importe donc sans erreur en 1.2.55.
 
 | 1.2.56 | **Audit tri/casse des listes de golfs** : la règle posée en 1.2.51 (tri alphabétique insensible à la casse + casse phrase, partout) n'était en réalité appliquée qu'à Gestion parcours — `sortCoursesByName` (`src/ui/formHelpers.js`) créé comme seul point de vérité et appliqué aussi à Modifier parcours, Supprimer parcours, Calibration GPS, Nouvelle partie et au filtre Golf partagé (`src/ui/filters.js`, Reprendre une partie/Historique/Statistiques) ; **graphiques Statistiques** : jusqu'à 3 graduations numériques sur l'axe Y (min, max, + valeur de la moyenne si elle ne chevauche pas les deux autres), ligne de moyenne recolorée en orange (`--color-chart-average`) au lieu de rouge, volontairement distincte de l'ambre déjà utilisé par la ligne objectif ; **écran de jeu** : case "En régulation sur green" et son libellé alignés sur une seule ligne (`createCheckboxField`, `src/ui/formHelpers.js`) au lieu d'être empilés |
 
-| 1.2.57 | **Écran de jeu** : bouton de bascule rapide Expert/Novice en haut à gauche (même ligne que le bouton d'aide) — même réglage `Player.appMode` que Réglages, change immédiatement l'affichage de l'écran en cours sans y passer ; **export PDF Carte de score** : correctif — la colonne Putts de la ligne "Total" affichait par erreur la moyenne au lieu de la somme réelle, désormais corrigée, avec une ligne "Moyenne putts" séparée en dessous ; nouveau **bouton "Export" en Statistiques** : PDF récapitulatif (valeurs chiffrées uniquement, pas de graphiques) pour les filtres Golf/Année/Mois/Club actuellement sélectionnés, via `src/export/statsPdf.js` et `buildStatsExportSummary` (`src/views/stats.js`, réutilise les mêmes fonctions de calcul que l'écran) ; chargement de jsPDF factorisé dans `src/export/pdfLib.js`, partagé entre `roundPdf.js` et `statsPdf.js` |
+| 1.2.57 | **Écran de jeu** : bouton de bascule rapide Expert/Novice en haut à gauche (même ligne que le bouton d'aide) — même réglage `Player.appMode` que Réglages, change immédiatement l'affichage de l'écran en cours sans y passer ; **export PDF Carte de score** : correctif — la colonne Putts de la ligne "Total" affichait par erreur la moyenne au lieu de la somme réelle, désormais corrigée, avec une ligne "Moyenne putts" séparée en dessous ; nouveau **bouton "Export" en Statistiques** : PDF récapitulatif (valeurs chiffrées uniquement, pas de graphiques) pour les filtres Golf/Année/Mois/Club actuellement sélectionnés, via `src/export/statsPdf.js` et `buildStatsExportSummary` (`src/views/stats.js`, réutilise les mêmes fonctions de calcul que l'écran) — putts objectif et réel affichés sur les deux échelles (total/18 trous et moyenne/trou) pour rester comparables ; chargement de jsPDF factorisé dans `src/export/pdfLib.js`, partagé entre `roundPdf.js` et `statsPdf.js` |
 
 ## Tenir ce README à jour
 

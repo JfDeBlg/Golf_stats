@@ -20,6 +20,19 @@ function ensureSpace(doc, y, needed = 10) {
   return 20;
 }
 
+function formatFrenchDecimal(value, decimals = 1) {
+  return value.toFixed(decimals).replace('.', ',');
+}
+
+// Objectif et réel sont tous deux affichés sur les deux échelles (total/18 trous et
+// moyenne/trou) pour rester comparables d'un coup d'oeil — total18 est déjà sur l'échelle
+// 18 trous (comme sur les graphiques de l'écran), la moyenne par trou s'en déduit (/18).
+function formatPuttsDual(label, total18) {
+  if (total18 == null) return `${label} : —`;
+  const perHole = total18 / 18;
+  return `${label} : ${formatFrenchDecimal(total18)} putts/18 trous (${formatFrenchDecimal(perHole, 2)}/trou)`;
+}
+
 function drawTable(doc, y, headers, rows, colWidths) {
   doc.setFontSize(10);
   let x = MARGIN_X;
@@ -63,9 +76,9 @@ export async function buildStatsSummaryPdfFile(summary) {
     return new File([blob], 'statistiques.pdf', { type: 'application/pdf' });
   }
 
-  doc.text(`Moyenne de putts : ${summary.globalAvgPutts ?? '—'}`, MARGIN_X, y);
+  doc.text(formatPuttsDual('Objectif', summary.puttsObjective), MARGIN_X, y);
   y += 7;
-  doc.text(`Objectif de putts personnalisé : ${summary.puttsObjective.toFixed(1).replace('.', ',')}`, MARGIN_X, y);
+  doc.text(formatPuttsDual('Réel', summary.realPutts18), MARGIN_X, y);
   y += 7;
 
   if (summary.hasAnyGirEver) {
