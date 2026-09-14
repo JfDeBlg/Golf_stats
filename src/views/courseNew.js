@@ -1,6 +1,7 @@
 // Écran Nouveau parcours.
 
 import { buildCourseForm, saveNewCourseFromFormData } from './courseFormShared.js';
+import { showSaveReminderToast } from '../ui/toast.js';
 
 export async function renderCourseNew(container, params, navigate) {
   const { form, getData } = await buildCourseForm();
@@ -21,6 +22,7 @@ export async function renderCourseNew(container, params, navigate) {
     try {
       await saveNewCourseFromFormData(getData(), 'manual');
       navigate('menu');
+      showSaveReminderToast();
     } catch (err) {
       errorEl.textContent = err.message;
     }

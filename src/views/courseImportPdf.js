@@ -12,6 +12,7 @@
 
 import { buildCourseForm, saveNewCourseFromFormData } from './courseFormShared.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
+import { showSaveReminderToast } from '../ui/toast.js';
 
 const SCORECARD_GENERATOR_URL = 'https://www.des-balles-et-des-birdies.com/calculScoreE1';
 
@@ -118,6 +119,7 @@ export async function renderCourseImportPdf(container, params, navigate) {
       try {
         await saveNewCourseFromFormData(getData(), 'pdf_import');
         navigate('menu');
+        showSaveReminderToast();
       } catch (err) {
         errorEl.textContent = err.message;
       }

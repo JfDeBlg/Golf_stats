@@ -194,7 +194,7 @@ export async function saveNewCourseFromFormData(data, source) {
     strokeIndex: h.strokeIndex,
     distanceByTee: h.distance != null ? { [data.tee.color]: h.distance } : {},
     teePositions: {},
-    greenPosition: null,
+    greenPositions: {},
   }));
   return saveCourse({
     name: data.name,

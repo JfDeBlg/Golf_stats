@@ -77,12 +77,30 @@ export async function deleteClub(id) {
 
 // --- Courses (golfs) ---
 
+// Migration à la lecture : les golfs calibrés avant la 1.2.55 stockent un point de green
+// unique (Hole.greenPosition) ; on le retraite en Hole.greenPositions.middle sans jamais
+// perdre de calibration existante. N'écrit rien en base — la nouvelle forme n'est persistée
+// que si le golf est ensuite réenregistré (calibration, édition...).
+function migrateHole(hole) {
+  if (hole.greenPositions) return hole;
+  if (hole.greenPosition) {
+    return { ...hole, greenPositions: { middle: hole.greenPosition } };
+  }
+  return { ...hole, greenPositions: {} };
+}
+
+function migrateCourse(course) {
+  if (!course) return course;
+  return { ...course, holes: (course.holes ?? []).map(migrateHole) };
+}
+
 export async function getCourses() {
-  return getAllRecords(STORES.COURSE);
+  const courses = await getAllRecords(STORES.COURSE);
+  return courses.map(migrateCourse);
 }
 
 export async function getCourse(id) {
-  return getRecord(STORES.COURSE, id);
+  return migrateCourse(await getRecord(STORES.COURSE, id));
 }
 
 export async function saveCourse(course) {

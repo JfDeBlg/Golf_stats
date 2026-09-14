@@ -8,7 +8,11 @@ export function getCurrentPositionOnce({ enableHighAccuracy = true, timeout = 10
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      (position) => resolve({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy ?? null,
+      }),
       (error) => reject(new Error(describeGeoError(error))),
       { enableHighAccuracy, timeout }
     );

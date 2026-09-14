@@ -236,6 +236,28 @@ body {
   color: var(--color-muted);
 }
 
+/* Variante compacte (Score brut / Putts en écran de jeu) : libellé en préfixe dans le même
+   cadre que le champ, plutôt qu'au-dessus sur sa propre ligne. */
+.field-inline {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.field-inline-label {
+  padding: 0 0.6rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.field-inline input {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+  min-width: 0;
+}
+
 input,
 select {
   padding: 0.6rem;
@@ -400,6 +422,19 @@ select {
   fill: var(--color-chart-target);
   font-size: 9px;
 }
+.chart-average-line {
+  stroke: var(--color-danger);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.chart-average-label {
+  fill: var(--color-danger);
+  font-size: 9px;
+}
+.putts-objective {
+  color: var(--color-chart-target);
+  font-weight: bold;
+}
 
 .list-select {
   display: flex;
@@ -455,6 +490,34 @@ select {
 .hole-nav button {
   flex: 1;
 }
+/* Écran de jeu uniquement (.hole-nav-fixed, en plus de .hole-nav) : barre Suivant/Précédent
+   toujours visible, épinglée en bas d'écran. .play-view-fixed-nav réserve l'espace
+   correspondant en bas de page pour que le contenu ne se retrouve jamais caché dessous. */
+.hole-nav-fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  background: var(--color-bg);
+  padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+}
+.play-view-fixed-nav {
+  padding-bottom: 4.5rem;
+}
+/* Bouton "remonter en haut" : toujours au-dessus de la barre Suivant/Précédent fixe, jamais
+   la chevaucher. */
+.scroll-top-btn {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  z-index: 6;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
 
 .shots-section h3 {
   margin: 0 0 0.5rem;
@@ -499,6 +562,9 @@ select {
 .shot-gps-row button {
   flex: 1;
 }
+.shot-gps-info p {
+  margin: 0;
+}
 
 .button-group {
   display: flex;
@@ -522,6 +588,34 @@ select {
 
 .stats-list {
   padding-left: 1.2rem;
+}
+
+/* Bandeau de rappel de sauvegarde ("toast") : non bloquant, épinglé en bas d'écran,
+   au-dessus de tout le reste (y compris la barre Suivant/Précédent fixe de l'écran de jeu,
+   qui n'est de toute façon plus montée une fois la partie terminée). */
+.save-toast {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.save-toast span {
+  flex: 1;
+  min-width: 10rem;
+}
+.save-toast button {
+  padding: 0.5rem 0.9rem;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -13,7 +13,7 @@ import { getCurrentPositionOnce } from '../geo/geolocation.js';
 import {
   prefillFromOpenStreetMap, prefillFromCoordinates, findGolfCoursesByAddress, resolveOsmWayLink,
 } from '../geo/openStreetMap.js';
-import { deriveCourseSource, isCourseFullyCalibrated } from '../scoring/calibration.js';
+import { deriveCourseSource, isCourseFullyCalibrated, getMiddleGreen } from '../scoring/calibration.js';
 import { createIcon } from '../ui/icons.js';
 import { createField, formatGolfName } from '../ui/formHelpers.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
@@ -21,6 +21,7 @@ import { createHelpButton } from '../ui/helpOverlay.js';
 const CALIBRATE_HELP_TEXT = [
   "Renseignez d'abord, pour chaque trou, son numéro, son index de difficulté (handicap) et sa distance.",
   "Ensuite, aidez-vous d'OpenStreetMap pour localiser précisément le parcours avant de calibrer les départs et les greens sur place.",
+  "Le green peut être calibré jusqu'à 3 points (entrée, milieu, sortie) : seul le milieu est nécessaire pour marquer le trou comme calibré, les deux autres sont optionnels.",
 ];
 
 function nextHoleNumber(n) {
@@ -31,9 +32,15 @@ function prevHoleNumber(n) {
   return n <= 1 ? 18 : n - 1;
 }
 
+const GREEN_POINTS = [
+  { key: 'front', buttonLabel: "Enregistrer l'entrée de green", statusLabel: "de l'entrée de green" },
+  { key: 'middle', buttonLabel: 'Enregistrer le milieu de green', statusLabel: 'du milieu de green' },
+  { key: 'back', buttonLabel: 'Enregistrer la sortie de green', statusLabel: 'de la sortie de green' },
+];
+
 function isHoleComplete(hole, tees) {
   if (tees.length === 0) return false;
-  return tees.every((t) => Boolean(hole.teePositions?.[t.color])) && Boolean(hole.greenPosition);
+  return tees.every((t) => Boolean(hole.teePositions?.[t.color])) && Boolean(getMiddleGreen(hole));
 }
 
 export async function renderCourseCalibrate(container, params, navigate) {
@@ -106,8 +113,9 @@ export async function renderCourseCalibrate(container, params, navigate) {
           }
         });
       }
-      if (match.green && !h.greenPosition) {
-        h.greenPosition = match.green;
+      if (match.green && !getMiddleGreen(h)) {
+        h.greenPositions = h.greenPositions ?? {};
+        h.greenPositions.middle = match.green;
         filled += 1;
       }
     });
@@ -348,12 +356,13 @@ export async function renderCourseCalibrate(container, params, navigate) {
     }
   }
 
-  async function captureGreen() {
+  async function captureGreen(key, statusLabel) {
     actionStatus.className = 'hint';
-    actionStatus.textContent = 'Localisation du green en cours…';
+    actionStatus.textContent = `Localisation ${statusLabel} en cours…`;
     try {
       const position = await getCurrentPositionOnce();
-      hole.greenPosition = position;
+      hole.greenPositions = hole.greenPositions ?? {};
+      hole.greenPositions[key] = position;
       await refresh();
     } catch (err) {
       actionStatus.className = 'error-msg';
@@ -372,13 +381,15 @@ export async function renderCourseCalibrate(container, params, navigate) {
     wrapper.appendChild(teeBtn);
   });
 
-  const greenBtn = document.createElement('button');
-  greenBtn.type = 'button';
-  greenBtn.className = 'btn-secondary';
-  if (hole.greenPosition) greenBtn.appendChild(createIcon('check', { size: 16 }));
-  greenBtn.appendChild(document.createTextNode('Enregistrer le green'));
-  greenBtn.addEventListener('click', captureGreen);
-  wrapper.appendChild(greenBtn);
+  GREEN_POINTS.forEach(({ key, buttonLabel, statusLabel }) => {
+    const greenBtn = document.createElement('button');
+    greenBtn.type = 'button';
+    greenBtn.className = 'btn-secondary';
+    if (hole.greenPositions?.[key]) greenBtn.appendChild(createIcon('check', { size: 16 }));
+    greenBtn.appendChild(document.createTextNode(buttonLabel));
+    greenBtn.addEventListener('click', () => captureGreen(key, statusLabel));
+    wrapper.appendChild(greenBtn);
+  });
 
   wrapper.appendChild(actionStatus);
 

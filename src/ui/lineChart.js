@@ -1,8 +1,17 @@
 // Mini-graphique en ligne, tracé en SVG manuel — pas de dépendance externe.
+//
+// Échelle adaptative (depuis la 1.2.55) : min/max calculés à partir des données affichées
+// (+ la ligne objectif, pour qu'elle reste toujours visible même hors de la plage des
+// données), avec une marge d'environ 8 % de part et d'autre plutôt qu'un axe Y fixe partant
+// de 0 — nécessaire dès que les valeurs affichées ne sont plus proches de 0 (ex : total de
+// putts ramené à 18 trous, de l'ordre de 30-40).
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const AXIS_MARGIN_RATIO = 0.08;
 
-export function buildLineChart(points, { width = 320, height = 180, target = null, targetLabel = '' } = {}) {
+export function buildLineChart(points, {
+  width = 320, height = 180, target = null, targetLabel = '', average = null, averageLabel = '',
+} = {}) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('class', 'line-chart');
@@ -15,9 +24,18 @@ export function buildLineChart(points, { width = 320, height = 180, target = nul
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
 
-  const values = target != null ? [...points.map((p) => p.value), target] : points.map((p) => p.value);
-  const minValue = Math.min(...values, 0);
-  const maxValue = Math.max(...values, 1);
+  const dataValues = points.map((p) => p.value);
+  const extremes = target != null ? [...dataValues, target] : dataValues;
+  let minValue = Math.min(...extremes);
+  let maxValue = Math.max(...extremes);
+  if (minValue === maxValue) {
+    minValue -= 1;
+    maxValue += 1;
+  }
+  const span = maxValue - minValue;
+  const margin = span * AXIS_MARGIN_RATIO;
+  minValue -= margin;
+  maxValue += margin;
   const range = maxValue - minValue || 1;
 
   const xFor = (i) => (points.length === 1
@@ -53,6 +71,29 @@ export function buildLineChart(points, { width = 320, height = 180, target = nul
       targetText.setAttribute('class', 'chart-target-label');
       targetText.textContent = targetLabel;
       svg.appendChild(targetText);
+    }
+  }
+
+  // Ligne de moyenne réelle des données affichées — distincte de la ligne "objectif"
+  // ci-dessus (statique ou personnalisée), recalculée à chaque filtre.
+  if (average != null) {
+    const averageY = yFor(average);
+    const averageLine = document.createElementNS(SVG_NS, 'line');
+    averageLine.setAttribute('x1', padding.left);
+    averageLine.setAttribute('y1', averageY);
+    averageLine.setAttribute('x2', width - padding.right);
+    averageLine.setAttribute('y2', averageY);
+    averageLine.setAttribute('class', 'chart-average-line');
+    svg.appendChild(averageLine);
+
+    if (averageLabel) {
+      const averageText = document.createElementNS(SVG_NS, 'text');
+      averageText.setAttribute('x', padding.left);
+      averageText.setAttribute('y', averageY - 4);
+      averageText.setAttribute('text-anchor', 'start');
+      averageText.setAttribute('class', 'chart-average-label');
+      averageText.textContent = averageLabel;
+      svg.appendChild(averageText);
     }
   }
 

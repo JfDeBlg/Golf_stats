@@ -2,22 +2,24 @@
 // Les totaux (score brut, écart, stableford) portent sur les trous "played" et
 // "abandoned" (qui ont chacun un score, même pénalisant pour l'abandon) ; les trous
 // "not_played" restent hors calcul. La moyenne de putts ne porte que sur les trous "played".
+// Depuis la 1.2.55, le tableau est identique en mode Expert et Simplifié (Trou/Par/Score/
+// Écart/Pts/Putts) : la différence entre les deux modes reste uniquement dans l'écran de jeu
+// (saisie club/coups en Expert, score+putts seuls en Simplifié).
 //
 // Lecture seule par défaut (y compris pour une partie en cours reprise, ou une partie
 // terminée consultée depuis l'Historique) : le bouton "Modifier" active le mode édition et
 // ouvre le trou 1 ; les lignes ne redeviennent cliquables qu'une fois ce mode actif, et ce
 // mode se propage tant qu'on va-et-vient entre carte de score et détail de trou.
 
-import { getRound, getCourse, getPlayer, saveRound } from '../db/repository.js';
+import { getRound, getCourse, saveRound } from '../db/repository.js';
 import { createIcon } from '../ui/icons.js';
 import { formatGolfName } from '../ui/formHelpers.js';
 import { formatToPar } from '../scoring/roundSummary.js';
+import { showSaveReminderToast } from '../ui/toast.js';
 
 export async function renderScorecard(container, params, navigate) {
   const round = await getRound(params.roundId);
   const course = await getCourse(round.courseId);
-  const player = await getPlayer();
-  const isSimplified = player?.appMode === 'simplified';
   const editMode = params.editMode ?? false;
 
   const info = document.createElement('p');
@@ -41,9 +43,7 @@ export async function renderScorecard(container, params, navigate) {
   const table = document.createElement('table');
   table.className = 'scorecard-table';
   const thead = document.createElement('thead');
-  thead.innerHTML = isSimplified
-    ? '<tr><th>Trou</th><th>Score</th><th>Putts</th></tr>'
-    : '<tr><th>Trou</th><th>Par</th><th>Score</th><th>Écart</th><th>Pts</th><th>Putts</th></tr>';
+  thead.innerHTML = '<tr><th>Trou</th><th>Par</th><th>Score</th><th>Écart</th><th>Pts</th><th>Putts</th></tr>';
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
 
@@ -74,9 +74,7 @@ export async function renderScorecard(container, params, navigate) {
       diffCell = formatToPar(diff);
     }
 
-    row.innerHTML = isSimplified
-      ? `<td>${hole.number}</td><td>${scoreCell}</td><td>${puttsCell}</td>`
-      : `<td>${hole.number}</td><td>${hole.par}</td><td>${scoreCell}</td><td>${diffCell}</td><td>${ptsCell}</td><td>${puttsCell}</td>`;
+    row.innerHTML = `<td>${hole.number}</td><td>${hole.par}</td><td>${scoreCell}</td><td>${diffCell}</td><td>${ptsCell}</td><td>${puttsCell}</td>`;
     tbody.appendChild(row);
 
     totalPar += hole.par;
@@ -97,9 +95,7 @@ export async function renderScorecard(container, params, navigate) {
   const puttsAverage = puttsPlayedCount > 0 ? (puttsTotal / puttsPlayedCount).toFixed(2) : '—';
 
   const tfoot = document.createElement('tfoot');
-  tfoot.innerHTML = isSimplified
-    ? `<tr><td>Total</td><td>${playedCount > 0 ? totalGross : '—'}</td><td>${puttsAverage}</td></tr>`
-    : `<tr>
+  tfoot.innerHTML = `<tr>
         <td>Total</td>
         <td>${totalPar}</td>
         <td>${playedCount > 0 ? totalGross : '—'}</td>
@@ -114,13 +110,39 @@ export async function renderScorecard(container, params, navigate) {
   tableScroll.appendChild(table);
   container.appendChild(tableScroll);
 
-  if (!isSimplified) {
-    const summary = document.createElement('p');
-    summary.className = 'hint';
-    const holeWord = playedCount > 1 ? 'trous joués' : 'trou joué';
-    summary.textContent = `Stableford : ${totalPoints} pts sur ${playedCount} ${holeWord}`;
-    container.appendChild(summary);
-  }
+  const summary = document.createElement('p');
+  summary.className = 'hint';
+  const holeWord = playedCount > 1 ? 'trous joués' : 'trou joué';
+  summary.textContent = `Stableford : ${totalPoints} pts sur ${playedCount} ${holeWord}`;
+  container.appendChild(summary);
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'btn-secondary';
+  exportBtn.appendChild(createIcon('document', { size: 16 }));
+  exportBtn.appendChild(document.createTextNode('Export partie'));
+  const exportStatus = document.createElement('p');
+  exportStatus.className = 'hint';
+  exportBtn.addEventListener('click', async () => {
+    exportStatus.className = 'hint';
+    exportStatus.textContent = 'Génération du PDF…';
+    exportBtn.disabled = true;
+    try {
+      const { buildRoundSummaryPdfFile } = await import('../export/roundPdf.js');
+      const { shareOrDownloadZip } = await import('../db/exportImport.js');
+      const pdfFile = await buildRoundSummaryPdfFile(round, course);
+      const result = await shareOrDownloadZip(pdfFile);
+      exportStatus.className = 'status-msg';
+      exportStatus.textContent = result === 'shared' ? 'Partage lancé.' : 'PDF téléchargé.';
+    } catch (err) {
+      exportStatus.className = 'error-msg';
+      exportStatus.textContent = `Export impossible : ${err.message}`;
+    } finally {
+      exportBtn.disabled = false;
+    }
+  });
+  container.appendChild(exportBtn);
+  container.appendChild(exportStatus);
 
   if (round.status !== 'completed') {
     const finishBtn = document.createElement('button');
@@ -132,6 +154,7 @@ export async function renderScorecard(container, params, navigate) {
       round.status = 'completed';
       await saveRound(round);
       navigate('scorecard', { roundId: round.id, editMode }, { replace: true });
+      showSaveReminderToast();
     });
     container.appendChild(finishBtn);
   }

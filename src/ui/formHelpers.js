@@ -28,6 +28,24 @@ export function createField(labelText, inputEl) {
   return wrapper;
 }
 
+// Variante compacte de createField : le libellé est affiché en préfixe à l'intérieur du même
+// cadre que le champ, plutôt qu'au-dessus sur sa propre ligne — utile pour gagner de la place
+// verticale (écran de jeu : Score brut / Putts).
+export function createInlineField(labelText, inputEl) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'field-inline';
+
+  const label = document.createElement('span');
+  label.className = 'field-inline-label';
+  label.textContent = labelText;
+
+  // Pas de <label for>/id ici : `label` est un <span> (association avec l'input impossible
+  // via `for`), à la différence de createField ci-dessus qui utilise un vrai <label>.
+  wrapper.appendChild(label);
+  wrapper.appendChild(inputEl);
+  return wrapper;
+}
+
 // Groupe de boutons à sélection unique (ex: lie, style de coup) — cliquer l'option déjà
 // sélectionnée la désélectionne (retour à null), pour un champ qui reste optionnel.
 export function createButtonGroup(options, selected, onSelect) {

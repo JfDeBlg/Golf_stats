@@ -9,6 +9,7 @@ import { getCourses, saveCourse } from '../db/repository.js';
 import { buildCourseForm } from './courseFormShared.js';
 import { deriveCourseSource } from '../scoring/calibration.js';
 import { formatGolfName } from '../ui/formHelpers.js';
+import { showSaveReminderToast } from '../ui/toast.js';
 
 function mergeTees(existingTees, newTee) {
   const tees = [...(existingTees ?? [])];
@@ -79,7 +80,7 @@ export async function renderCourseEdit(container, params, navigate) {
           strokeIndex: h.strokeIndex,
           distanceByTee,
           teePositions: existingHole?.teePositions ?? {},
-          greenPosition: existingHole?.greenPosition ?? null,
+          greenPositions: existingHole?.greenPositions ?? {},
         };
       });
       const updatedCourse = {
@@ -91,6 +92,7 @@ export async function renderCourseEdit(container, params, navigate) {
       updatedCourse.source = deriveCourseSource(updatedCourse, course.source);
       await saveCourse(updatedCourse);
       navigate('menu');
+      showSaveReminderToast();
     } catch (err) {
       errorEl.textContent = err.message;
     }

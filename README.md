@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.54** (voir `src/version.js`).
+Version actuelle : **1.2.55** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -16,11 +16,16 @@ Version actuelle : **1.2.54** (voir `src/version.js`).
   distance, géolocalisation auto) a un repli manuel toujours disponible et fonctionnel,
   y compris permission refusée ou signal absent.
 - **HTML/CSS/JS vanilla** : pas de framework, pas de bundler, pas de dépendance npm sauf
-  strictement nécessaire — deux exceptions à ce jour, toutes deux vendorées localement et
-  jamais chargées depuis un CDN : pdf.js (import de cartes de score) et JSZip (export/partage
-  en ZIP). Même principe pour les icônes : uniquement des tracés SVG inline dans
+  strictement nécessaire — trois exceptions à ce jour, toutes vendorées localement et jamais
+  chargées depuis un CDN : pdf.js (import de cartes de score), JSZip (export/partage en ZIP)
+  et jsPDF (export PDF d'une partie depuis la Carte de score). Même principe pour les icônes :
+  uniquement des tracés SVG inline dans
   `src/icons/icons.js` (parfois inspirés d'un set existant comme Tabler Icons, mais jamais
   chargés via une police d'icônes ou un CDN).
+- **Pas de sauvegarde silencieuse possible sur iPhone** (aucun accès disque persistant hors
+  de l'app) : après une action importante (création/modification de parcours, clôture de
+  partie), un bandeau non bloquant (`src/ui/toast.js`) rappelle d'exporter, avec un raccourci
+  direct vers l'export déjà existant — jamais de tentative de sauvegarde automatique.
 - **Couleurs toujours via les variables de thème** (`:root` dans `style.css`), jamais une
   couleur figée (`#fff`, `#eee`, etc.) à côté d'une couleur qui suit déjà le thème — sinon
   texte et fond peuvent diverger et devenir illisibles en thème sombre (bug rencontré et
@@ -78,6 +83,9 @@ src/
                               ramenés à 18 trous par règle de trois, + formatToPar (mise en
                               forme "+20"/"-2"/"0", partagée avec la Carte de score) —
                               utilisé par Reprendre une partie et Historique
+    puttsObjective.js         Objectif de putts (18 trous) pour un index de handicap donné,
+                              par interpolation linéaire dans PUTTS_OBJECTIVE_TABLE
+                              (extrapolation si l'index est hors de la plage 0-30)
 
   geo/
     geolocation.js          Enveloppe autour de navigator.geolocation (ping ponctuel)
@@ -92,17 +100,27 @@ src/
                               paresseusement (import() dynamique) au moment de l'usage, pas
                               au démarrage de l'app
 
+  export/
+    roundPdf.js              Génère le PDF (une page) d'export d'une partie depuis la Carte
+                              de score, via jsPDF ; chargé paresseusement à l'usage, jamais au
+                              démarrage — même précaution que pdf.js/JSZip
+
   lib/
     pdf.js, pdf.worker.js     pdf.js (build legacy, vendoré) — extraction de texte PDF
     jszip.min.js               JSZip 3.10.1 (build UMD, vendoré) — génération du ZIP
                               d'export/partage ; chargé paresseusement via un <script>
                               classique injecté à la demande, jamais au démarrage
+    jspdf.umd.min.js            jsPDF 2.5.1 (build UMD, vendoré) — génération du PDF d'export
+                              de partie ; même chargement paresseux via <script> injecté
 
   data/
     standardClubs.js          Liste standard de clubs suggérée dans Réglages
     shotOptions.js             Options de lie arrivée (7, dont Green/Avant-green/
                                 Out-Perdue), de style de coup (10, dont Topée/Air shot/
                                 Socket) et de contact (Bon/Moyen/Mauvais)
+    puttsObjectiveTable.js      Table de référence "objectif de putts sur 18 trous" par index
+                                de handicap (0 à 30, pas de 5), utilisée en Statistiques via
+                                scoring/puttsObjective.js
 
   ui/
     formHelpers.js             createField (champ label+input), createButtonGroup
@@ -123,6 +141,10 @@ src/
                                   une bulle d'aide plein écran (fermeture par croix, clic
                                   extérieur ou Échap) ; superposée en dehors du routeur, donc
                                   sa fermeture ne modifie jamais l'historique de navigation
+    toast.js                     showSaveReminderToast() : bandeau non bloquant de rappel de
+                                  sauvegarde, avec raccourci direct vers l'export existant ;
+                                  affiché après création/modification de parcours et clôture
+                                  de partie (pas de sauvegarde silencieuse possible sur iPhone)
 
   icons/
     icons.js                    Set d'icônes SVG inline (pas de police/CDN externe) ;
@@ -158,7 +180,10 @@ src/
     courseCalibrate.js              Calibration GPS trou par trou ; bouton d'aide ; amorce
                                     OpenStreetMap par lieu approximatif OU par lien
                                     OpenStreetMap direct (.../way/<id>), chacun avec sa
-                                    propre gestion d'erreur indépendante
+                                    propre gestion d'erreur indépendante ; green calibrable
+                                    jusqu'à 3 points (entrée/milieu/sortie,
+                                    Hole.greenPositions), seul le milieu est requis pour
+                                    marquer le trou comme calibré
     courseFormShared.js             Formulaire de golf partagé (création/import/édition) :
                                     pas de champ Lieu (localisation issue uniquement de la
                                     calibration GPS/OSM), couleur de départ en liste
@@ -174,25 +199,45 @@ src/
                                        bouton d'aide
     play.js                           Écran de jeu : un trou à la fois, navigation
                                        circulaire, score/putts/coups, statut de trou. En-tête
-                                       ("Trou n - Par n - distance en m") toujours visible
-                                       pendant le défilement (sticky) ; case "En régulation
-                                       sur green" (GIR) sous Putts ; par coup, boutons GPS
-                                       explicites Départ/Arrivée (ping ponctuel haute
-                                       précision chacun), distance calculée et affichée dès
-                                       que les deux sont connues — Départ préempli depuis le
-                                       départ calibré (1er coup) ou l'Arrivée du coup
-                                       précédent (coups suivants), toujours ré-pingable ;
-                                       bouton d'aide
-    scorecard.js                      Carte de score (lecture seule / mode édition)
+                                       ("Trou n - Par n - Hcp n - distance en m") toujours
+                                       visible pendant le défilement (sticky) ; libellés
+                                       "Score brut"/"Putts" en préfixe dans le cadre du champ
+                                       (createInlineField) ; case "En régulation sur green"
+                                       (GIR) sous Putts ; barre Suivant/Précédent épinglée en
+                                       bas d'écran (.hole-nav-fixed), bouton "remonter en
+                                       haut" juste au-dessus ; "Distance au green" affiche les
+                                       3 distances Entrée/Milieu/Sortie si calibrées, sinon
+                                       seulement Milieu ; par coup, boutons GPS explicites
+                                       Départ/Arrivée (ping ponctuel haute précision chacun),
+                                       distance calculée et affichée dès que les deux sont
+                                       connues — Départ préempli depuis le départ calibré (1er
+                                       coup) ou l'Arrivée du coup précédent (coups suivants),
+                                       toujours ré-pingable ; coordonnées brutes (+ précision
+                                       GPS) de chaque position figée affichées sous les
+                                       boutons ; bouton d'aide ; toast de rappel de sauvegarde
+                                       après "Terminer la partie"
+    scorecard.js                      Carte de score (lecture seule / mode édition), tableau
+                                       identique en mode Expert et Simplifié depuis la 1.2.55 ;
+                                       bouton "Export partie" (PDF via jsPDF, partagé/téléchargé
+                                       comme l'export ZIP) ; toast de rappel de sauvegarde
+                                       après "Terminer la partie"
     history.js                        Historique des parties terminées, même tableau (Écart
                                        au par signé) et même normalisation à 18 trous que
                                        Reprendre une partie, filtrable (Golf/Année/Mois)
-    stats.js                          Statistiques (putts, % GIR, stableford, distribution
-                                       des scores par rapport au par, distance par club,
-                                       analyses lie/style/contact) ; filtres Golf/Année/Mois
-                                       en haut (s'appliquent à tout), filtre Club positionné
-                                       sous les deux graphiques, juste au-dessus des sections
-                                       qu'il affecte réellement ; bouton d'aide
+    stats.js                          Statistiques : table de référence + objectif de putts
+                                       personnalisé par index (interpolation linéaire,
+                                       puttsObjective.js), putts (total ramené à 18 trous),
+                                       % GIR, stableford (ramené à 18 trous), évolution de la
+                                       régulation sur green, distribution des scores par
+                                       rapport au par, distance par club, analyses
+                                       lie/style/contact ; les trois graphiques en ligne ont
+                                       une échelle adaptative (marge ~8 % autour des données +
+                                       ligne objectif), une ligne rouge de moyenne réelle en
+                                       plus de la ligne orange d'objectif (sauf régulation sur
+                                       green, sans objectif) ; filtres Golf/Année/Mois en haut
+                                       (s'appliquent à tout), filtre Club positionné sous les
+                                       graphiques, juste au-dessus des sections qu'il affecte
+                                       réellement ; bouton d'aide
 ```
 
 ## Modèle de données (IndexedDB)
@@ -203,7 +248,8 @@ src/
 - **Course** : `id`, `name`, `location`, `source`
   (`"manual" | "pdf_import" | "osm_prefilled" | "calibrated"`), `recommendedTees[]`
   (`{color, slope, sss}`), `holes[]` (`{number, par, strokeIndex, distanceByTee,
-  teePositions, greenPosition}`)
+  teePositions, greenPositions}`) — `greenPositions` : `{front?, middle?, back?}` (chacun un
+  point GPS optionnel ; seul `middle` est requis pour qu'un trou compte comme calibré)
 - **Round** : `id`, `date`, `courseId`, `teeColor`, `handicapIndexAtPlay`, `courseHandicap`,
   `startHole`, `status` (`"in_progress" | "completed"`), `weather`, `holeScores[]`
 - **HoleScore** : `holeNumber`, `status` (`"not_played" | "played" | "abandoned"`),
@@ -212,6 +258,10 @@ src/
 - **Shot** : `clubId`, `isFullShot`, `startPosition`, `endPosition`, `distance`, `lie`
   (7 valeurs, dont Green/Avant-green/Out-Perdue), `shape` (10 valeurs, dont Topée/Air
   shot/Socket), `contact` (Bon/Moyen/Mauvais ou `null`)
+- **Position** (`teePositions[color]`, `greenPositions.{front,middle,back}`,
+  `Shot.startPosition`/`endPosition`) : `{lat, lng, accuracy}` — `accuracy` (mètres, issu de
+  `coords.accuracy`) est optionnelle et sert uniquement à l'affichage (transparence sur la
+  précision réelle du GPS), jamais dans les calculs de distance
 
 `Course.source` ne bascule vers `"calibrated"` que via une calibration manuelle sur place
 qui complète les 18 trous ; un préremplissage OpenStreetMap marque `"osm_prefilled"` et ne
@@ -227,6 +277,14 @@ Depuis la 1.2.54, `Shot.startPosition`/`endPosition` ne sont plus chaînés impl
 dans `play.js`, chacun déclenchant son propre ping GPS ponctuel. "Ajouter un coup" se
 contente de préremplir `startPosition` (départ calibré pour le 1er coup du trou, sinon
 `endPosition` du coup précédent si déjà renseignée) — sans jamais géolocaliser lui-même.
+
+Depuis la 1.2.55, `Hole.greenPosition` (point unique) est remplacé par `Hole.greenPositions`
+(`{front, middle, back}`). Migration à la lecture, sans perte : `src/db/repository.js`
+(`getCourse`/`getCourses`) retraite à la volée un `Hole.greenPosition` hérité en
+`greenPositions.middle` ; `src/scoring/calibration.js` (`getMiddleGreen`) retombe aussi sur
+l'ancien champ par sécurité. Rien n'est réécrit en base tant que le golf n'est pas
+réenregistré (calibration, édition...) — un export JSON/ZIP réalisé en 1.2.54 ou antérieur
+s'importe donc sans erreur en 1.2.55.
 
 ## Historique des versions
 
@@ -246,6 +304,7 @@ contente de préremplir `startPosition` (départ calibré pour le 1er coup du tr
 | 1.2.52 | Reprendre une partie et Historique : colonne "Score brut" remplacée par "Écart" (écart signé au par, ramené à 18 trous par règle de trois, ex: "+20"/"-2"/"0") — même formatage (`formatToPar`) que celui déjà utilisé par la Carte de score, désormais factorisé dans `src/scoring/roundSummary.js` ; icône satellite remplacée par le tracé officiel Tabler `ti-satellite` (silhouette de satellite classique) dans `src/icons/icons.js` ; **correctif de contraste** : `.btn-secondary` utilisait un fond gris clair figé (`#e9e9e3`) alors que son texte suit le thème — illisible (texte clair sur fond clair) une fois le thème sombre actif ; même bug corrigé sur les états `:active` de `.menu-item`/`.menu-dropdown-item`/lignes de tableau cliquables (`#eee` figé) ; tous remplacés par une variable de thème dédiée (`--color-secondary-bg`, adaptée par thème) — convention documentée directement dans `style.css` ; Réglages : la fonction d'import est désormais entourée d'un encadré distinct (`.import-box`) avec un texte d'orientation selon l'appareil (app Fichiers/Google Drive/dossier Téléchargements) |
 | 1.2.53 | Réglages, section "Sauvegarde / Partage" : le bloc unique à 3 boutons devient 3 encadrés séparés (`.action-box`, ex-`.import-box` généralisée), chacun avec sa propre phrase d'explication sous le bouton (Exporter et partager / Télécharger en ZIP / Importer) — ajustement de présentation uniquement, le mécanisme d'export/import est inchangé |
 | 1.2.54 | **Contraste thème sombre** : graphiques Statistiques (courbe, points, chiffres d'axe) et aperçus (dont la distance au green) utilisaient `--color-primary` (vert très sombre, jamais redéfini en thème sombre) comme couleur de texte, quasi invisibles sur fond presque noir — remplacés par `--color-accent-text` (clair en thème sombre), lignes de référence "objectif" éclaircies (`--color-chart-target`) ; **écran de jeu** : en-tête ("Trou n - Par n - distance en m") rendu `sticky`, toujours visible pendant le défilement des coups ; **coups** : chaînage GPS implicite du Lot 2 remplacé par des boutons explicites Départ/Arrivée par coup (ping ponctuel haute précision chacun), distance calculée et affichée automatiquement dès que les deux sont connues, Départ préempli (départ calibré pour le 1er coup, Arrivée du coup précédent sinon) mais toujours ré-pingable ; champ Lie renommé "Lie arrivée" et étendu (+ Green, Avant-green, Out/Perdue) ; Style de coup étendu (+ Topée, Air shot, Socket) ; nouveau champ Contact (Bon/Moyen/Mauvais) ; nouvelle case "En régulation sur green" (GIR) au niveau du trou ; **Statistiques** : nouvelle section Contact, nouveau "% en régulation sur green", nouveau graphique en barres de distribution des scores par rapport au par (Eagle/Birdie/Par/Bogey/Double/Triple ou plus, `src/ui/barChart.js`) |
+| 1.2.55 | **Rappel de sauvegarde** : bandeau non bloquant (`src/ui/toast.js`) après création/modification de parcours et clôture de partie, avec raccourci direct vers l'export existant (pas de sauvegarde silencieuse possible sur iPhone) ; **mode Simplifié** : Carte de score identique au mode Expert (Trou/Par/Score/Écart/Pts/Putts, plus de tableau réduit) — la différence entre modes reste uniquement dans l'écran de jeu ; **graphiques Statistiques** : échelle adaptative (min/max des données + marge ~8 %) sur Putting/Stableford/nouveau graphique Régulation sur green, ligne rouge de moyenne réelle en plus de la ligne orange d'objectif ; métrique Putting remplacée par le total de putts ramené à 18 trous ; nouvel **objectif de putts personnalisé** par index de handicap (interpolation linéaire dans une table de référence, `src/data/puttsObjectiveTable.js` + `src/scoring/puttsObjective.js`), affiché en Statistiques avant le graphique Putting et utilisé comme ligne objectif ; **écran de jeu** : en-tête enrichi (`Trou n - Par n - Hcp n - distance`), barre Suivant/Précédent épinglée en bas d'écran + bouton "remonter en haut", libellés "Score brut"/"Putts" en préfixe du champ (`createInlineField`), coordonnées GPS brutes (+ précision) affichées sous les boutons Départ/Arrivée de chaque coup ; **green multi-points** : jusqu'à 3 repères par trou (Entrée/Milieu/Sortie, `Hole.greenPositions`, migration transparente depuis l'ancien `Hole.greenPosition`), "Distance au green" affiche les 3 distances si calibrées ; **Carte de score** : bouton "Export partie" (PDF via jsPDF vendoré, partagé/téléchargé comme l'export ZIP) |
 
 ## Tenir ce README à jour
 

@@ -10,16 +10,26 @@ import { getRound, getCourse, saveRound, getClubs, getPlayer } from '../db/repos
 import { computeNetStablefordPoints } from '../scoring/stableford.js';
 import { haversineDistance } from '../scoring/distance.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
-import { createField, createButtonGroup } from '../ui/formHelpers.js';
+import { createField, createInlineField, createButtonGroup } from '../ui/formHelpers.js';
 import { createIcon } from '../ui/icons.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
+import { showSaveReminderToast } from '../ui/toast.js';
 import { LIE_OPTIONS, SHAPE_OPTIONS, CONTACT_OPTIONS } from '../data/shotOptions.js';
 
 const PLAY_HELP_TEXT = [
-  "L'en-tête (trou, par, distance totale du départ joué) reste visible en haut de l'écran pendant que vous faites défiler les coups.",
-  "Sur chaque coup : les boutons \"Départ\" et \"Arrivée\" font chacun un ping GPS ponctuel ; dès que les deux sont renseignés, la distance parcourue est calculée et affichée automatiquement. Le premier coup d'un trou est préempli avec le départ calibré ; les coups suivants reprennent l'arrivée du coup précédent si elle est déjà renseignée — vous pouvez toujours repinguer pour corriger.",
+  "L'en-tête (trou, par, handicap, distance totale du départ joué) reste visible en haut de l'écran pendant que vous faites défiler les coups.",
+  "Sur chaque coup : les boutons \"Départ\" et \"Arrivée\" font chacun un ping GPS ponctuel ; dès que les deux sont renseignés, la distance parcourue est calculée et affichée automatiquement. Le premier coup d'un trou est préempli avec le départ calibré ; les coups suivants reprennent l'arrivée du coup précédent si elle est déjà renseignée — vous pouvez toujours repinguer pour corriger. Les coordonnées brutes de chaque position figée s'affichent sous les boutons, pour rester transparent sur la précision réelle du GPS.",
   "\"En régulation sur green\" (GIR) se coche manuellement une fois le trou terminé, si le green a été atteint en par − 2 coups ou moins.",
+  '"Distance au green" affiche les distances Entrée/Milieu/Sortie si les 3 points ont été calibrés, sinon uniquement la distance au milieu.',
 ];
+
+function formatPositionCoords(position) {
+  if (!position) return null;
+  const lat = position.lat.toFixed(5);
+  const lng = position.lng.toFixed(5);
+  const accuracy = position.accuracy != null ? ` (précision ${Math.round(position.accuracy)} m)` : '';
+  return `Lat ${lat}, Lng ${lng}${accuracy}`;
+}
 
 function nextHoleNumber(n) {
   return n >= 18 ? 1 : n + 1;
@@ -45,17 +55,27 @@ export async function renderPlay(container, params, navigate) {
   container.appendChild(headerRow);
 
   const wrapper = document.createElement('div');
-  wrapper.className = 'play-view';
+  wrapper.className = 'play-view play-view-fixed-nav';
 
   const header = document.createElement('div');
   header.className = 'play-header';
   const headerTitle = document.createElement('h2');
   const teeDistance = hole.distanceByTee?.[round.teeColor];
-  headerTitle.textContent = `Trou ${holeNumber} - Par ${hole.par}` + (teeDistance != null ? ` - ${teeDistance}m` : '');
+  const headerParts = [`Trou ${holeNumber}`, `Par ${hole.par}`];
+  if (hole.strokeIndex != null) headerParts.push(`Hcp ${hole.strokeIndex}`);
+  if (teeDistance != null) headerParts.push(`${teeDistance}m`);
+  headerTitle.textContent = headerParts.join(' - ');
   header.appendChild(headerTitle);
   wrapper.appendChild(header);
 
   if (!isSimplified) {
+    const greenPositions = hole.greenPositions ?? {};
+    const greenPoints = [
+      { label: 'Entrée', position: greenPositions.front },
+      { label: 'Milieu', position: greenPositions.middle },
+      { label: 'Sortie', position: greenPositions.back },
+    ].filter((p) => p.position);
+
     const distanceBtn = document.createElement('button');
     distanceBtn.type = 'button';
     distanceBtn.className = 'btn-secondary';
@@ -63,7 +83,7 @@ export async function renderPlay(container, params, navigate) {
     const distanceResult = document.createElement('p');
     distanceResult.className = 'hint';
     distanceBtn.addEventListener('click', async () => {
-      if (!hole.greenPosition) {
+      if (greenPoints.length === 0) {
         distanceResult.className = 'hint';
         distanceResult.textContent = 'Green non calibré pour ce trou.';
         return;
@@ -72,9 +92,15 @@ export async function renderPlay(container, params, navigate) {
       distanceResult.textContent = 'Localisation en cours…';
       try {
         const position = await getCurrentPositionOnce();
-        const distance = Math.round(haversineDistance(position, hole.greenPosition));
         distanceResult.className = 'stableford-preview';
-        distanceResult.textContent = `Distance au green : ${distance} m`;
+        if (greenPoints.length === 1 && greenPoints[0].label === 'Milieu') {
+          const distance = Math.round(haversineDistance(position, greenPoints[0].position));
+          distanceResult.textContent = `Distance au green : ${distance} m`;
+        } else {
+          distanceResult.textContent = greenPoints
+            .map((p) => `${p.label} : ${Math.round(haversineDistance(position, p.position))} m`)
+            .join(' / ');
+        }
       } catch (err) {
         distanceResult.className = 'error-msg';
         distanceResult.textContent = err.message;
@@ -119,13 +145,13 @@ export async function renderPlay(container, params, navigate) {
     grossInput.type = 'number';
     grossInput.min = '1';
     grossInput.value = holeScore.grossScore ?? '';
-    form.appendChild(createField('Score brut', grossInput));
+    form.appendChild(createInlineField('Score brut', grossInput));
 
     const puttsInput = document.createElement('input');
     puttsInput.type = 'number';
     puttsInput.min = '0';
     puttsInput.value = holeScore.putts ?? '';
-    form.appendChild(createField('Putts', puttsInput));
+    form.appendChild(createInlineField('Putts', puttsInput));
 
     const girInput = document.createElement('input');
     girInput.type = 'checkbox';
@@ -310,6 +336,32 @@ export async function renderPlay(container, params, navigate) {
           gpsRow.appendChild(startBtn);
           gpsRow.appendChild(endBtn);
           card.appendChild(gpsRow);
+
+          // Transparence sur ce qui a été réellement figé (coordonnées brutes + précision
+          // GPS si disponible), pour lever le doute sur la précision perçue d'une position —
+          // même issue d'un simple préremplissage (départ calibré, arrivée du coup précédent)
+          // plutôt que d'un ping fait sur ce coup précis.
+          const gpsInfo = document.createElement('div');
+          gpsInfo.className = 'shot-gps-info';
+          if (shot.startPosition) {
+            const p = document.createElement('p');
+            p.className = 'hint';
+            p.textContent = `Départ figé — ${formatPositionCoords(shot.startPosition)}`;
+            gpsInfo.appendChild(p);
+          }
+          if (shot.endPosition) {
+            const p = document.createElement('p');
+            p.className = 'hint';
+            p.textContent = `Arrivée figée — ${formatPositionCoords(shot.endPosition)}`;
+            gpsInfo.appendChild(p);
+          }
+          if (shot.startPosition && shot.endPosition && shot.distance != null) {
+            const p = document.createElement('p');
+            p.className = 'hint';
+            p.textContent = `Distance calculée : ${Math.round(shot.distance)} m`;
+            gpsInfo.appendChild(p);
+          }
+          card.appendChild(gpsInfo);
           card.appendChild(gpsStatus);
 
           const lieField = document.createElement('div');
@@ -400,8 +452,16 @@ export async function renderPlay(container, params, navigate) {
     wrapper.appendChild(abandonBtn);
   }
 
+  const scrollTopBtn = document.createElement('button');
+  scrollTopBtn.type = 'button';
+  scrollTopBtn.className = 'btn-icon scroll-top-btn';
+  scrollTopBtn.setAttribute('aria-label', 'Remonter en haut');
+  scrollTopBtn.appendChild(createIcon('arrowUp', { size: 20 }));
+  scrollTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  wrapper.appendChild(scrollTopBtn);
+
   const navRow = document.createElement('div');
-  navRow.className = 'hole-nav';
+  navRow.className = 'hole-nav hole-nav-fixed';
 
   const prevBtn = document.createElement('button');
   prevBtn.type = 'button';
@@ -441,6 +501,7 @@ export async function renderPlay(container, params, navigate) {
       round.status = 'completed';
       await persist();
       navigate('scorecard', { roundId: round.id, editMode });
+      showSaveReminderToast();
     });
     wrapper.appendChild(finishBtn);
   }

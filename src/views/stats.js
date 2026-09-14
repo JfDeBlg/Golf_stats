@@ -1,19 +1,22 @@
-// Écran Statistiques : moyenne de putts globale, % en régulation sur green (GIR), deux
-// graphiques (putting, score stableford ramené à 18 trous), un graphique à barres de
-// distribution des scores par rapport au par, un tableau de distance moyenne par club, et
+// Écran Statistiques : table de référence + objectif de putts personnalisé (par index),
+// moyenne de putts globale, % en régulation sur green (GIR), trois graphiques (putting ramené
+// à 18 trous, score stableford ramené à 18 trous, évolution de la régulation sur green — tous
+// à échelle adaptative avec ligne objectif et ligne de moyenne réelle), un graphique à barres
+// de distribution des scores par rapport au par, un tableau de distance moyenne par club, et
 // des analyses lie/style/contact de coup. Filtres Golf/Année/Mois en haut de l'écran
 // (s'appliquent à tout) ; le filtre Club est positionné plus bas, juste au-dessus des
 // seules sections qu'il affecte réellement (`filterBar.clubFilterElement`, retourné
 // séparément par `src/ui/filters.js` pour ne pas être rendu avec le reste de la barre de
 // filtres) :
-//   - Moyenne de putts, % GIR, les deux graphiques et la distribution des scores :
-//     Golf/Année/Mois uniquement (rien de tout ça n'est rattaché à un club unique ; les
-//     lignes objectif restent affichées quel que soit le filtre).
+//   - Table/objectif de putts, moyenne de putts, % GIR, les trois graphiques et la
+//     distribution des scores : Golf/Année/Mois uniquement (rien de tout ça n'est rattaché à
+//     un club unique).
 //   - Distance par club et analyses lie/style/contact : Golf/Année/Mois + Club.
-// % GIR et Contact n'apparaissent que si au moins une donnée correspondante a déjà été
-// renseignée (même règle que lie/style, déjà en place).
-// En mode Simplifié, seules les statistiques score/putts restent affichées (pas de filtre
-// Club, les sections club/coup étant elles-mêmes masquées).
+// % GIR, graphique GIR et Contact n'apparaissent que si au moins une donnée correspondante a
+// déjà été renseignée (même règle que lie/style, déjà en place).
+// En mode Simplifié, les mêmes statistiques score/putts qu'en mode Expert restent affichées
+// (seuls la distance par club et les analyses lie/style/contact sont masquées, naturellement
+// vides puisque non saisies dans ce mode — pas de filtre Club non plus).
 
 import { getRounds, getClubs, getCourses, getPlayer } from '../db/repository.js';
 import { buildLineChart } from '../ui/lineChart.js';
@@ -21,13 +24,55 @@ import { buildBarChart } from '../ui/barChart.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
 import { LIE_OPTIONS, SHAPE_OPTIONS, CONTACT_OPTIONS } from '../data/shotOptions.js';
+import { PUTTS_OBJECTIVE_TABLE } from '../data/puttsObjectiveTable.js';
+import { computePuttsObjective } from '../scoring/puttsObjective.js';
 
 const STATS_HELP_TEXT = [
   'Les filtres Golf/Année/Mois/Club en haut de l\'écran sont partagés par toutes les sections ci-dessous, mais chacune n\'applique que les filtres qui la concernent.',
-  'La moyenne de putts, le % en régulation sur green, les deux graphiques et la distribution des scores ignorent le filtre Club (aucun de ces éléments n\'est rattaché à un club unique) ; les lignes pointillées sont vos objectifs (2 putts/trou, 36 points).',
+  'La moyenne de putts, le % en régulation sur green, les graphiques et la distribution des scores ignorent le filtre Club (aucun de ces éléments n\'est rattaché à un club unique).',
+  'Sur les graphiques Putting/Stableford/Régulation sur green : la ligne pointillée orange est votre objectif (personnalisé selon votre index pour le putting, 36 points pour le stableford, aucun pour la régulation sur green) ; la ligne pointillée rouge est la moyenne réelle des parties affichées. L\'échelle de chaque graphique s\'adapte automatiquement aux données affichées.',
   'Le tableau de distance et les analyses lie/style/contact tiennent compte de tous les filtres, y compris Club.',
   'Ces sections (contact, % GIR, distribution des scores) n\'apparaissent que si vous avez déjà renseigné au moins une donnée correspondante.',
 ];
+
+function formatFrenchDecimal(value, decimals = 1) {
+  return value.toFixed(decimals).replace('.', ',');
+}
+
+function buildPuttsObjectiveSection(handicapIndex) {
+  const section = document.createElement('div');
+
+  const title = document.createElement('h2');
+  title.textContent = 'Objectif de putts (référence par index)';
+  section.appendChild(title);
+
+  const objective = computePuttsObjective(handicapIndex ?? 0);
+  const objectiveText = document.createElement('p');
+  objectiveText.className = 'putts-objective';
+  objectiveText.textContent = `Objectif : ${formatFrenchDecimal(objective)} (pour votre index actuel : ${handicapIndex ?? 0})`;
+  section.appendChild(objectiveText);
+
+  const table = document.createElement('table');
+  table.className = 'scorecard-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = '<tr><th>Index</th><th>Putts (objectif/18 trous)</th></tr>';
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  PUTTS_OBJECTIVE_TABLE.forEach((row) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.index}</td><td>${formatFrenchDecimal(row.putts)}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  section.appendChild(wrapScroll(table));
+
+  return { section, objective };
+}
+
+function computeAverage(points) {
+  if (points.length === 0) return null;
+  return points.reduce((s, p) => s + p.value, 0) / points.length;
+}
 
 // --- Distribution des scores par rapport au par ---
 
@@ -262,13 +307,16 @@ function buildContactSection(filteredRounds, clubFilterId, hasAnyContactEver) {
 
 // --- Rendu ---
 
-function renderFilteredContent(container, allRounds, clubs, courseById, isSimplified, filters, hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, clubFilterElement) {
+function renderFilteredContent(container, allRounds, clubs, courseById, isSimplified, filters, hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, clubFilterElement, player) {
   const roundsMatchingFilters = allRounds.filter((r) => roundMatchesFilters(r, filters));
 
   const completedRounds = roundsMatchingFilters
     .filter((r) => r.status === 'completed')
     .slice()
     .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  const { section: objectiveSection, objective: puttsObjective } = buildPuttsObjectiveSection(player?.handicapIndex);
+  container.appendChild(objectiveSection);
 
   if (completedRounds.length === 0) {
     const empty = document.createElement('p');
@@ -281,6 +329,7 @@ function renderFilteredContent(container, allRounds, clubs, courseById, isSimpli
     let totalGirHits = 0;
     const puttsPoints = [];
     const stableford18Points = [];
+    const girPoints = [];
 
     completedRounds.forEach((round) => {
       const playedHoles = round.holeScores.filter((h) => h.status === 'played');
@@ -290,9 +339,14 @@ function renderFilteredContent(container, allRounds, clubs, courseById, isSimpli
       const roundPutts = playedHoles.reduce((s, h) => s + (h.putts ?? 0), 0);
       totalPuttsAll += roundPutts;
       totalPlayedHolesAll += playedHoles.length;
-      totalGirHits += playedHoles.filter((h) => h.girHit === true).length;
+      const roundGirHits = playedHoles.filter((h) => h.girHit === true).length;
+      totalGirHits += roundGirHits;
       if (playedHoles.length > 0) {
-        puttsPoints.push({ label, value: Number((roundPutts / playedHoles.length).toFixed(2)) });
+        const putts18 = roundPutts * (18 / playedHoles.length);
+        puttsPoints.push({ label, value: Number(putts18.toFixed(1)) });
+        if (hasAnyGirEver) {
+          girPoints.push({ label, value: Math.round((roundGirHits / playedHoles.length) * 100) });
+        }
       }
 
       const roundPoints = round.holeScores.reduce((s, h) => s + (h.stablefordNetPoints ?? 0), 0);
@@ -318,14 +372,34 @@ function renderFilteredContent(container, allRounds, clubs, courseById, isSimpli
     }
 
     const puttsTitle = document.createElement('h2');
-    puttsTitle.textContent = 'Putting — moyenne par partie';
+    puttsTitle.textContent = 'Putting — total ramené à 18 trous';
     container.appendChild(puttsTitle);
-    container.appendChild(buildLineChart(puttsPoints, { target: 2, targetLabel: 'Objectif : 2 putts/trou' }));
+    container.appendChild(buildLineChart(puttsPoints, {
+      target: puttsObjective,
+      targetLabel: `Objectif : ${formatFrenchDecimal(puttsObjective)}`,
+      average: computeAverage(puttsPoints),
+      averageLabel: 'Moyenne',
+    }));
 
     const stablefordTitle = document.createElement('h2');
     stablefordTitle.textContent = 'Score stableford — ramené à 18 trous';
     container.appendChild(stablefordTitle);
-    container.appendChild(buildLineChart(stableford18Points, { target: 36, targetLabel: 'Objectif : 36 pts' }));
+    container.appendChild(buildLineChart(stableford18Points, {
+      target: 36,
+      targetLabel: 'Objectif : 36 pts',
+      average: computeAverage(stableford18Points),
+      averageLabel: 'Moyenne',
+    }));
+
+    if (hasAnyGirEver) {
+      const girTitle = document.createElement('h2');
+      girTitle.textContent = 'Régulation sur green — évolution';
+      container.appendChild(girTitle);
+      container.appendChild(buildLineChart(girPoints, {
+        average: computeAverage(girPoints),
+        averageLabel: 'Moyenne',
+      }));
+    }
 
     const distributionTitle = document.createElement('h2');
     distributionTitle.textContent = 'Distribution des scores par rapport au par';
@@ -369,7 +443,7 @@ export async function renderStats(container) {
     content.innerHTML = '';
     renderFilteredContent(
       content, allRounds, clubs, courseById, isSimplified, filters,
-      hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, filterBar.clubFilterElement
+      hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, filterBar.clubFilterElement, player
     );
   }
 
