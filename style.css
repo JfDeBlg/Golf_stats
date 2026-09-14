@@ -82,6 +82,18 @@
   justify-content: flex-end;
   margin-bottom: 0.25rem;
 }
+/* Variante à deux éléments (ex: écran de jeu — bascule Expert/Novice à gauche, aide à
+   droite) : .screen-header-row garde son comportement par défaut (flex-end) pour tous les
+   écrans qui n'ont que le bouton d'aide, cette classe supplémentaire n'écrase l'alignement
+   que là où elle est explicitement ajoutée. */
+.screen-header-row-split {
+  justify-content: space-between;
+  align-items: center;
+}
+.mode-toggle-btn {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+}
 
 html,
 body {

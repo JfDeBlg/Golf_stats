@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.56** (voir `src/version.js`).
+Version actuelle : **1.2.57** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -101,9 +101,19 @@ src/
                               au démarrage de l'app
 
   export/
+    pdfLib.js                Chargement paresseux partagé de jsPDF (loadJsPDF), utilisé par
+                              roundPdf.js et statsPdf.js — un seul point de chargement,
+                              jamais au démarrage de l'app
     roundPdf.js              Génère le PDF (une page) d'export d'une partie depuis la Carte
-                              de score, via jsPDF ; chargé paresseusement à l'usage, jamais au
-                              démarrage — même précaution que pdf.js/JSZip
+                              de score : total réel des putts + ligne "Moyenne putts"
+                              séparée (corrigé en 1.2.57, la colonne Putts du total
+                              affichait la moyenne par erreur)
+    statsPdf.js              Génère le PDF (une ou plusieurs pages) d'export des
+                              Statistiques pour les filtres actifs (Golf/Année/Mois/Club) :
+                              valeurs chiffrées uniquement (pas de graphiques reproduits en
+                              image), construites par buildStatsExportSummary
+                              (src/views/stats.js) à partir des mêmes fonctions de calcul
+                              que l'écran, pour qu'export et affichage ne divergent jamais
 
   lib/
     pdf.js, pdf.worker.js     pdf.js (build legacy, vendoré) — extraction de texte PDF
@@ -212,9 +222,13 @@ src/
                                        liste de golfs triée via sortCoursesByName ; bouton
                                        d'aide
     play.js                           Écran de jeu : un trou à la fois, navigation
-                                       circulaire, score/putts/coups, statut de trou. En-tête
-                                       ("Trou n - Par n - Hcp n - distance en m") toujours
-                                       visible pendant le défilement (sticky) ; libellés
+                                       circulaire, score/putts/coups, statut de trou. Bouton
+                                       de bascule rapide Expert/Novice en haut à gauche (même
+                                       ligne que le bouton d'aide), même réglage
+                                       Player.appMode que Réglages — change immédiatement
+                                       l'affichage de l'écran en cours, sans y passer.
+                                       En-tête ("Trou n - Par n - Hcp n - distance en m")
+                                       toujours visible pendant le défilement (sticky) ; libellés
                                        "Score brut"/"Putts" en préfixe dans le cadre du champ
                                        (createInlineField) ; case "En régulation sur green"
                                        (GIR) sous Putts, case et libellé sur la même ligne
@@ -254,7 +268,11 @@ src/
                                        ; filtres Golf/Année/Mois en haut
                                        (s'appliquent à tout), filtre Club positionné sous les
                                        graphiques, juste au-dessus des sections qu'il affecte
-                                       réellement ; bouton d'aide
+                                       réellement ; bouton "Export" (PDF récapitulatif des
+                                       valeurs chiffrées pour les filtres actifs, sans les
+                                       graphiques, via jsPDF — buildStatsExportSummary
+                                       garantit que le PDF ne peut pas diverger de l'écran) ;
+                                       bouton d'aide
 ```
 
 ## Modèle de données (IndexedDB)
@@ -324,6 +342,8 @@ s'importe donc sans erreur en 1.2.55.
 | 1.2.55 | **Rappel de sauvegarde** : bandeau non bloquant (`src/ui/toast.js`) après création/modification de parcours et clôture de partie, avec raccourci direct vers l'export existant (pas de sauvegarde silencieuse possible sur iPhone) ; **mode Simplifié** : Carte de score identique au mode Expert (Trou/Par/Score/Écart/Pts/Putts, plus de tableau réduit) — la différence entre modes reste uniquement dans l'écran de jeu ; **graphiques Statistiques** : échelle adaptative (min/max des données + marge ~8 %) sur Putting/Stableford/nouveau graphique Régulation sur green, ligne rouge de moyenne réelle en plus de la ligne orange d'objectif ; métrique Putting remplacée par le total de putts ramené à 18 trous ; nouvel **objectif de putts personnalisé** par index de handicap (interpolation linéaire dans une table de référence, `src/data/puttsObjectiveTable.js` + `src/scoring/puttsObjective.js`), affiché en Statistiques avant le graphique Putting et utilisé comme ligne objectif ; **écran de jeu** : en-tête enrichi (`Trou n - Par n - Hcp n - distance`), barre Suivant/Précédent épinglée en bas d'écran + bouton "remonter en haut", libellés "Score brut"/"Putts" en préfixe du champ (`createInlineField`), coordonnées GPS brutes (+ précision) affichées sous les boutons Départ/Arrivée de chaque coup ; **green multi-points** : jusqu'à 3 repères par trou (Entrée/Milieu/Sortie, `Hole.greenPositions`, migration transparente depuis l'ancien `Hole.greenPosition`), "Distance au green" affiche les 3 distances si calibrées ; **Carte de score** : bouton "Export partie" (PDF via jsPDF vendoré, partagé/téléchargé comme l'export ZIP) |
 
 | 1.2.56 | **Audit tri/casse des listes de golfs** : la règle posée en 1.2.51 (tri alphabétique insensible à la casse + casse phrase, partout) n'était en réalité appliquée qu'à Gestion parcours — `sortCoursesByName` (`src/ui/formHelpers.js`) créé comme seul point de vérité et appliqué aussi à Modifier parcours, Supprimer parcours, Calibration GPS, Nouvelle partie et au filtre Golf partagé (`src/ui/filters.js`, Reprendre une partie/Historique/Statistiques) ; **graphiques Statistiques** : jusqu'à 3 graduations numériques sur l'axe Y (min, max, + valeur de la moyenne si elle ne chevauche pas les deux autres), ligne de moyenne recolorée en orange (`--color-chart-average`) au lieu de rouge, volontairement distincte de l'ambre déjà utilisé par la ligne objectif ; **écran de jeu** : case "En régulation sur green" et son libellé alignés sur une seule ligne (`createCheckboxField`, `src/ui/formHelpers.js`) au lieu d'être empilés |
+
+| 1.2.57 | **Écran de jeu** : bouton de bascule rapide Expert/Novice en haut à gauche (même ligne que le bouton d'aide) — même réglage `Player.appMode` que Réglages, change immédiatement l'affichage de l'écran en cours sans y passer ; **export PDF Carte de score** : correctif — la colonne Putts de la ligne "Total" affichait par erreur la moyenne au lieu de la somme réelle, désormais corrigée, avec une ligne "Moyenne putts" séparée en dessous ; nouveau **bouton "Export" en Statistiques** : PDF récapitulatif (valeurs chiffrées uniquement, pas de graphiques) pour les filtres Golf/Année/Mois/Club actuellement sélectionnés, via `src/export/statsPdf.js` et `buildStatsExportSummary` (`src/views/stats.js`, réutilise les mêmes fonctions de calcul que l'écran) ; chargement de jsPDF factorisé dans `src/export/pdfLib.js`, partagé entre `roundPdf.js` et `statsPdf.js` |
 
 ## Tenir ce README à jour
 

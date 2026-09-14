@@ -6,7 +6,7 @@
 // points d'entrée. En mode Simplifié (Player.appMode), seuls le score et les putts sont
 // saisissables : ni bouton club, ni bouton distance, ni détail de coup.
 
-import { getRound, getCourse, saveRound, getClubs, getPlayer } from '../db/repository.js';
+import { getRound, getCourse, saveRound, getClubs, getPlayer, savePlayer } from '../db/repository.js';
 import { computeNetStablefordPoints } from '../scoring/stableford.js';
 import { haversineDistance } from '../scoring/distance.js';
 import { getCurrentPositionOnce } from '../geo/geolocation.js';
@@ -22,6 +22,12 @@ const PLAY_HELP_TEXT = [
   "\"En régulation sur green\" (GIR) se coche manuellement une fois le trou terminé, si le green a été atteint en par − 2 coups ou moins.",
   '"Distance au green" affiche les distances Entrée/Milieu/Sortie si les 3 points ont été calibrés, sinon uniquement la distance au milieu.',
 ];
+
+// "Novice" est le libellé utilisateur du mode "simplified" sur ce bouton — même réglage
+// Player.appMode que dans Réglages, pas un second interrupteur séparé.
+function appModeDisplayLabel(appMode) {
+  return appMode === 'simplified' ? 'Novice' : 'Expert';
+}
 
 function formatPositionCoords(position) {
   if (!position) return null;
@@ -50,7 +56,20 @@ export async function renderPlay(container, params, navigate) {
   const isSimplified = player?.appMode === 'simplified';
 
   const headerRow = document.createElement('div');
-  headerRow.className = 'screen-header-row';
+  headerRow.className = 'screen-header-row screen-header-row-split';
+
+  const modeToggleBtn = document.createElement('button');
+  modeToggleBtn.type = 'button';
+  modeToggleBtn.className = 'btn-secondary mode-toggle-btn';
+  modeToggleBtn.textContent = `Mode : ${appModeDisplayLabel(player?.appMode)}`;
+  modeToggleBtn.addEventListener('click', async () => {
+    const nextMode = isSimplified ? 'expert' : 'simplified';
+    const currentPlayer = player ?? { gender: 'H', firstName: '', lastName: '', handicapIndex: 0 };
+    await savePlayer({ ...currentPlayer, appMode: nextMode });
+    navigate('play', { roundId: round.id, holeNumber, editMode }, { replace: true });
+  });
+  headerRow.appendChild(modeToggleBtn);
+
   headerRow.appendChild(createHelpButton(PLAY_HELP_TEXT));
   container.appendChild(headerRow);
 

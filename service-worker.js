@@ -2,7 +2,7 @@
 // CACHE_NAME embarque la version de l'app pour forcer l'invalidation du cache à chaque
 // nouveau lot déployé — garder ce numéro synchronisé avec src/version.js (APP_VERSION).
 
-const CACHE_NAME = 'golf-app-cache-v1.2.56';
+const CACHE_NAME = 'golf-app-cache-v1.2.57';
 const ASSETS = [
   './',
   './index.html',
@@ -34,6 +34,8 @@ const ASSETS = [
   './src/data/puttsObjectiveTable.js',
   './src/import/pdfScorecard.js',
   './src/export/roundPdf.js',
+  './src/export/statsPdf.js',
+  './src/export/pdfLib.js',
   './src/lib/pdf.js',
   './src/lib/pdf.worker.js',
   './src/lib/jszip.min.js',

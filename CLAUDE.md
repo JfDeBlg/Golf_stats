@@ -83,9 +83,15 @@ Layer boundaries:
   reconstructing layout from the (x, y) of text fragments pdf.js extracts. Loaded lazily via
   dynamic `import()` at time of use, never at app startup (a static import once caused a
   white-screen failure on some iOS engines — see the 1.2.5 entry in README.md).
-- `src/export/roundPdf.js` — builds a one-page PDF summary of a round (Carte de score's
-  "Export partie" button) via vendored jsPDF, sharing/downloading the result the same way as
-  the ZIP export (`shareOrDownloadZip`). Loaded lazily, same precaution as pdf.js.
+- `src/export/` — `pdfLib.js` is the single lazy-loader for vendored jsPDF (`loadJsPDF`),
+  shared by the other two builders so the loading boilerplate exists once. `roundPdf.js`
+  builds a one-page PDF summary of a round (Carte de score's "Export partie" button); its
+  totals row shows the real putts sum with a separate "Moyenne putts" line below (a 1.2.56
+  version of this showed the average mislabeled as the total — fixed in 1.2.57, watch for the
+  same sum-vs-average confusion elsewhere). `statsPdf.js` builds a numbers-only PDF of the
+  Statistiques screen for whatever filters are active — no charts reproduced as images. Both
+  export files share/download the result the same way as the ZIP export
+  (`shareOrDownloadZip`) and load lazily, same precaution as pdf.js.
 - `src/lib/` — vendored third-party code only: pdf.js/pdf.worker.js (legacy build),
   jszip.min.js and jspdf.umd.min.js (UMD builds, each injected via a `<script>` tag on
   demand, never at startup).
@@ -102,6 +108,14 @@ Layer boundaries:
   router so closing it never touches navigation history); and the non-blocking save-reminder
   banner (`showSaveReminderToast`, [toast.js](src/ui/toast.js), shown after course create/edit
   and round completion — no silent background save is possible on iPhone).
+
+Pattern worth reusing: [stats.js](src/views/stats.js)'s `buildStatsExportSummary` computes a
+plain-data summary from the same pure functions the on-screen render uses
+(`computeGlobalPuttsAndGir`, `computeScoreDistribution`, `computeClubDistanceStats`,
+`computeDistributionCounts`), then `statsPdf.js` renders that summary to PDF — so the export
+can never show different numbers than the filtered screen it was generated from. Follow this
+shape (pure summary function + separate renderer) for any future screen-matching export
+rather than re-deriving values inline in the PDF builder.
 
 ## Data model (IndexedDB)
 

@@ -12,22 +12,7 @@
 
 import { formatGolfName } from '../ui/formHelpers.js';
 import { formatToPar } from '../scoring/roundSummary.js';
-
-let jsPDFLoadPromise = null;
-
-function loadJsPDF() {
-  if (window.jspdf?.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
-  if (!jsPDFLoadPromise) {
-    jsPDFLoadPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = new URL('../lib/jspdf.umd.min.js', import.meta.url).href;
-      script.onload = () => resolve(window.jspdf?.jsPDF);
-      script.onerror = () => reject(new Error('Impossible de charger jsPDF.'));
-      document.head.appendChild(script);
-    });
-  }
-  return jsPDFLoadPromise;
-}
+import { loadJsPDF } from './pdfLib.js';
 
 const COLUMNS = [
   { label: 'Trou', width: 18 },
@@ -121,11 +106,14 @@ export async function buildRoundSummaryPdfFile(round, course) {
     playedCount > 0 ? String(totalGross) : '—',
     formatToPar(diffTotal),
     String(totalPoints),
-    puttsAverage,
+    puttsPlayedCount > 0 ? String(puttsTotal) : '—',
   ].forEach((cell, i) => {
     doc.text(cell, x, y);
     x += COLUMNS[i].width;
   });
+
+  y += 8;
+  doc.text(`Moyenne putts : ${puttsAverage}`, marginX, y);
 
   const blob = doc.output('blob');
   const dateStamp = round.date.replace(/-/g, '');

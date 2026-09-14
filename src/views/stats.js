@@ -23,6 +23,8 @@ import { buildLineChart } from '../ui/lineChart.js';
 import { buildBarChart } from '../ui/barChart.js';
 import { buildFilterBar, roundMatchesFilters } from '../ui/filters.js';
 import { createHelpButton } from '../ui/helpOverlay.js';
+import { createIcon } from '../ui/icons.js';
+import { formatGolfName } from '../ui/formHelpers.js';
 import { LIE_OPTIONS, SHAPE_OPTIONS, CONTACT_OPTIONS } from '../data/shotOptions.js';
 import { PUTTS_OBJECTIVE_TABLE } from '../data/puttsObjectiveTable.js';
 import { computePuttsObjective } from '../scoring/puttsObjective.js';
@@ -33,6 +35,7 @@ const STATS_HELP_TEXT = [
   'Sur les graphiques Putting/Stableford/Régulation sur green : la ligne pointillée orange est votre objectif (personnalisé selon votre index pour le putting, 36 points pour le stableford, aucun pour la régulation sur green) ; la ligne pointillée rouge est la moyenne réelle des parties affichées. L\'échelle de chaque graphique s\'adapte automatiquement aux données affichées.',
   'Le tableau de distance et les analyses lie/style/contact tiennent compte de tous les filtres, y compris Club.',
   'Ces sections (contact, % GIR, distribution des scores) n\'apparaissent que si vous avez déjà renseigné au moins une donnée correspondante.',
+  'Le bouton "Export" génère un PDF récapitulatif (valeurs chiffrées, sans les graphiques) pour les filtres actuellement sélectionnés.',
 ];
 
 function formatFrenchDecimal(value, decimals = 1) {
@@ -72,6 +75,25 @@ function buildPuttsObjectiveSection(handicapIndex) {
 function computeAverage(points) {
   if (points.length === 0) return null;
   return points.reduce((s, p) => s + p.value, 0) / points.length;
+}
+
+// Moyenne de putts et % GIR globaux (parties filtrées) — extrait en fonction pure pour être
+// le seul point de calcul partagé entre l'affichage à l'écran et l'export PDF (éviter que les
+// deux divergent, comme c'était le cas avant correctif dans src/export/roundPdf.js).
+function computeGlobalPuttsAndGir(completedRounds, hasAnyGirEver) {
+  let totalPuttsAll = 0;
+  let totalPlayedHolesAll = 0;
+  let totalGirHits = 0;
+  completedRounds.forEach((round) => {
+    const playedHoles = round.holeScores.filter((h) => h.status === 'played');
+    totalPuttsAll += playedHoles.reduce((s, h) => s + (h.putts ?? 0), 0);
+    totalPlayedHolesAll += playedHoles.length;
+    totalGirHits += playedHoles.filter((h) => h.girHit === true).length;
+  });
+  return {
+    globalAvgPutts: totalPlayedHolesAll > 0 ? (totalPuttsAll / totalPlayedHolesAll).toFixed(2) : null,
+    girPct: hasAnyGirEver && totalPlayedHolesAll > 0 ? Math.round((totalGirHits / totalPlayedHolesAll) * 100) : null,
+  };
 }
 
 // --- Distribution des scores par rapport au par ---
@@ -185,7 +207,10 @@ function collectShotsWithRound(rounds) {
   return items;
 }
 
-function distributionTable(shots, field, options, label) {
+// Pur : compte de coups par valeur d'un champ (lie/style/contact), en % du total de coups
+// où ce champ est renseigné — null si aucun coup n'a ce champ renseigné. Partagé entre
+// distributionTable (DOM, ci-dessous) et l'export PDF des statistiques.
+function computeDistributionCounts(shots, field, options) {
   const counts = new Map();
   let total = 0;
   shots.forEach((shot) => {
@@ -196,18 +221,25 @@ function distributionTable(shots, field, options, label) {
   });
   if (total === 0) return null;
 
+  return options
+    .map((option) => ({ label: option, count: counts.get(option) ?? 0 }))
+    .filter((row) => row.count > 0)
+    .map((row) => ({ ...row, pct: Math.round((row.count / total) * 100) }));
+}
+
+function distributionTable(shots, field, options, label) {
+  const rows = computeDistributionCounts(shots, field, options);
+  if (!rows) return null;
+
   const table = document.createElement('table');
   table.className = 'scorecard-table';
   const thead = document.createElement('thead');
   thead.innerHTML = `<tr><th>${label}</th><th>Nombre</th><th>%</th></tr>`;
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
-  options.forEach((option) => {
-    const count = counts.get(option) ?? 0;
-    if (count === 0) return;
+  rows.forEach(({ label: rowLabel, count, pct }) => {
     const row = document.createElement('tr');
-    const pct = Math.round((count / total) * 100);
-    row.innerHTML = `<td>${option}</td><td>${count}</td><td>${pct}%</td>`;
+    row.innerHTML = `<td>${rowLabel}</td><td>${count}</td><td>${pct}%</td>`;
     tbody.appendChild(row);
   });
   table.appendChild(tbody);
@@ -324,9 +356,6 @@ function renderFilteredContent(container, allRounds, clubs, courseById, isSimpli
     empty.textContent = 'Aucune partie terminée pour ces filtres.';
     container.appendChild(empty);
   } else {
-    let totalPuttsAll = 0;
-    let totalPlayedHolesAll = 0;
-    let totalGirHits = 0;
     const puttsPoints = [];
     const stableford18Points = [];
     const girPoints = [];
@@ -337,10 +366,7 @@ function renderFilteredContent(container, allRounds, clubs, courseById, isSimpli
       const label = formatShortDate(round.date);
 
       const roundPutts = playedHoles.reduce((s, h) => s + (h.putts ?? 0), 0);
-      totalPuttsAll += roundPutts;
-      totalPlayedHolesAll += playedHoles.length;
       const roundGirHits = playedHoles.filter((h) => h.girHit === true).length;
-      totalGirHits += roundGirHits;
       if (playedHoles.length > 0) {
         const putts18 = roundPutts * (18 / playedHoles.length);
         puttsPoints.push({ label, value: Number(putts18.toFixed(1)) });
@@ -356,15 +382,14 @@ function renderFilteredContent(container, allRounds, clubs, courseById, isSimpli
       }
     });
 
-    const globalAvgPutts = totalPlayedHolesAll > 0 ? (totalPuttsAll / totalPlayedHolesAll).toFixed(2) : '—';
+    const { globalAvgPutts, girPct } = computeGlobalPuttsAndGir(completedRounds, hasAnyGirEver);
 
     const summary = document.createElement('p');
     summary.className = 'hint';
-    summary.textContent = `Moyenne de putts (parties filtrées) : ${globalAvgPutts}`;
+    summary.textContent = `Moyenne de putts (parties filtrées) : ${globalAvgPutts ?? '—'}`;
     container.appendChild(summary);
 
     if (hasAnyGirEver) {
-      const girPct = totalPlayedHolesAll > 0 ? Math.round((totalGirHits / totalPlayedHolesAll) * 100) : null;
       const girSummary = document.createElement('p');
       girSummary.className = 'hint';
       girSummary.textContent = `En régulation sur green (parties filtrées) : ${girPct != null ? `${girPct}%` : '—'}`;
@@ -417,6 +442,74 @@ function renderFilteredContent(container, allRounds, clubs, courseById, isSimpli
   }
 }
 
+// Assemble un objet de données pur (aucun DOM) résumant les statistiques pour les filtres
+// donnés, destiné à l'export PDF (src/export/statsPdf.js). Réutilise exactement les mêmes
+// fonctions de calcul que renderFilteredContent ci-dessus (computeGlobalPuttsAndGir,
+// computeScoreDistribution, computeClubDistanceStats, computeDistributionCounts) pour que
+// le PDF ne puisse jamais afficher des chiffres différents de l'écran filtré courant.
+function buildStatsExportSummary({
+  allRounds, clubs, courses, courseById, isSimplified, filters,
+  hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, player,
+}) {
+  const roundsMatchingFilters = allRounds.filter((r) => roundMatchesFilters(r, filters));
+  const completedRounds = roundsMatchingFilters
+    .filter((r) => r.status === 'completed')
+    .slice()
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  const puttsObjective = computePuttsObjective(player?.handicapIndex ?? 0);
+  const { globalAvgPutts, girPct } = computeGlobalPuttsAndGir(completedRounds, hasAnyGirEver);
+  const scoreDistribution = completedRounds.length > 0 ? computeScoreDistribution(completedRounds, courseById) : null;
+
+  let clubDistanceStats = null;
+  let lieDistribution = null;
+  let shapeDistribution = null;
+  let contactDistribution = null;
+
+  if (!isSimplified) {
+    clubDistanceStats = computeClubDistanceStats(roundsMatchingFilters, clubs, filters.clubId)
+      .map(({ club, avgDistance, count }) => ({ clubName: club.name, avgDistance, count }));
+
+    let shots = collectShotsWithRound(roundsMatchingFilters).map((item) => item.shot);
+    if (filters.clubId) shots = shots.filter((s) => s.clubId === filters.clubId);
+    if (hasAnyLieOrShapeEver) {
+      lieDistribution = computeDistributionCounts(shots, 'lie', LIE_OPTIONS);
+      shapeDistribution = computeDistributionCounts(shots, 'shape', SHAPE_OPTIONS);
+    }
+    if (hasAnyContactEver) {
+      contactDistribution = computeDistributionCounts(shots, 'contact', CONTACT_OPTIONS);
+    }
+  }
+
+  const courseLabel = filters.courseId
+    ? formatGolfName(courses.find((c) => c.id === filters.courseId)?.name ?? '')
+    : 'Tous les golfs';
+  const clubLabel = filters.clubId ? (clubs.find((c) => c.id === filters.clubId)?.name ?? '') : 'Tous les clubs';
+  const filtersLabelParts = [
+    `Golf : ${courseLabel}`,
+    `Année : ${filters.year ?? 'toutes'}`,
+    `Mois : ${filters.month ?? 'tous'}`,
+  ];
+  if (!isSimplified) filtersLabelParts.push(`Club : ${clubLabel}`);
+
+  return {
+    filtersLabel: filtersLabelParts.join(' — '),
+    hasCompletedRounds: completedRounds.length > 0,
+    puttsObjective,
+    globalAvgPutts,
+    hasAnyGirEver,
+    girPct,
+    scoreDistribution,
+    isSimplified,
+    clubDistanceStats,
+    hasAnyLieOrShapeEver,
+    lieDistribution,
+    shapeDistribution,
+    hasAnyContactEver,
+    contactDistribution,
+  };
+}
+
 export async function renderStats(container) {
   const headerRow = document.createElement('div');
   headerRow.className = 'screen-header-row';
@@ -434,6 +527,38 @@ export async function renderStats(container) {
 
   const filterBar = buildFilterBar({ courses, clubs: isSimplified ? null : clubs }, refresh);
   container.appendChild(filterBar.element);
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'btn-secondary';
+  exportBtn.appendChild(createIcon('document', { size: 16 }));
+  exportBtn.appendChild(document.createTextNode('Export'));
+  const exportStatus = document.createElement('p');
+  exportStatus.className = 'hint';
+  exportBtn.addEventListener('click', async () => {
+    exportStatus.className = 'hint';
+    exportStatus.textContent = 'Génération du PDF…';
+    exportBtn.disabled = true;
+    try {
+      const summary = buildStatsExportSummary({
+        allRounds, clubs, courses, courseById, isSimplified, filters: filterBar.getFilters(),
+        hasAnyLieOrShapeEver, hasAnyContactEver, hasAnyGirEver, player,
+      });
+      const { buildStatsSummaryPdfFile } = await import('../export/statsPdf.js');
+      const { shareOrDownloadZip } = await import('../db/exportImport.js');
+      const pdfFile = await buildStatsSummaryPdfFile(summary);
+      const result = await shareOrDownloadZip(pdfFile);
+      exportStatus.className = 'status-msg';
+      exportStatus.textContent = result === 'shared' ? 'Partage lancé.' : 'PDF téléchargé.';
+    } catch (err) {
+      exportStatus.className = 'error-msg';
+      exportStatus.textContent = `Export impossible : ${err.message}`;
+    } finally {
+      exportBtn.disabled = false;
+    }
+  });
+  container.appendChild(exportBtn);
+  container.appendChild(exportStatus);
 
   const content = document.createElement('div');
   container.appendChild(content);
