@@ -64,7 +64,7 @@ export async function renderPlay(container, params, navigate) {
   modeToggleBtn.textContent = `Mode : ${appModeDisplayLabel(player?.appMode)}`;
   modeToggleBtn.addEventListener('click', async () => {
     const nextMode = isSimplified ? 'expert' : 'simplified';
-    const currentPlayer = player ?? { gender: 'H', firstName: '', lastName: '', handicapIndex: 0 };
+    const currentPlayer = player ?? { gender: 'H', trigram: '', handicapIndex: 0 };
     await savePlayer({ ...currentPlayer, appMode: nextMode });
     navigate('play', { roundId: round.id, holeNumber, editMode }, { replace: true });
   });

@@ -4,7 +4,7 @@ PWA installable (iPhone Safari/Chrome) pour un joueur unique : carte de score de
 calcul automatique brut/stableford net, et assistance GPS ponctuelle (calibration de
 parcours, distance au drapeau, distance réelle des coups pleins).
 
-Version actuelle : **1.2.57** (voir `src/version.js`).
+Version actuelle : **1.2.58** (voir `src/version.js`).
 
 ## Principes non négociables
 
@@ -33,6 +33,11 @@ Version actuelle : **1.2.57** (voir `src/version.js`).
   1.2.54 sur `--color-primary` utilisée comme couleur de *texte* — courbes/points des
   graphiques, aperçus, messages de succès — jamais redéfinie en thème sombre et donc quasi
   invisible sur fond presque noir ; remplacée par `--color-accent-text`, adaptée par thème).
+- **Le joueur n'est jamais identifié par son nom** : `Player.trigram` (3 lettres) remplace
+  `firstName`/`lastName` depuis la 1.2.58 — le dépôt GitHub (et donc le dossier `data/`,
+  voir plus bas) est public, et un export peut y être déposé pour être restauré sur un autre
+  appareil. Un export reste malgré tout identifiable par son contenu (handicap, dates, golfs,
+  scores) : voir "Sauvegarde côté serveur" plus bas avant d'y déposer quoi que ce soit.
 
 ## Lancer en local
 
@@ -99,6 +104,12 @@ src/
                               (x, y) des fragments de texte extraits par pdf.js — chargé
                               paresseusement (import() dynamique) au moment de l'usage, pas
                               au démarrage de l'app
+    serverRestore.js         Restauration depuis une sauvegarde hébergée dans data/ (voir
+                              section dédiée plus bas) : proposée automatiquement si la base
+                              est entièrement vide au démarrage (src/main.js), ou à la
+                              demande depuis Réglages ; réutilise readExportFile/
+                              importExportData (même validations, même compatibilité
+                              ascendante que l'import local)
 
   export/
     pdfLib.js                Chargement paresseux partagé de jsPDF (loadJsPDF), utilisé par
@@ -181,11 +192,14 @@ src/
                                   chacun avec son icône) ; exporte aussi
                                   MENU_ITEMS/activateMenuItem, réutilisés par le menu
                                   sandwich de src/main.js pour garder un seul ordre partout
-    settings.js                  Réglages : profil (dont mode Expert/Simplifié), clubs,
-                                  section "Sauvegarde / Partage" avec un encadré distinct
-                                  par action (Exporter et partager / Télécharger en ZIP /
-                                  Importer .json ou .zip), chacun avec sa propre phrase
-                                  d'explication (buildActionBox) — pas de liste de golfs ici
+    settings.js                  Réglages : profil (trigramme, genre, index, mode
+                                  Expert/Simplifié), clubs, section "Sauvegarde / Partage"
+                                  avec un encadré distinct par action — Exporter et partager /
+                                  Export ZIP local / Exporter les parcours seulement /
+                                  Importer .json ou .zip / Restaurer depuis le serveur —
+                                  chacun avec sa propre phrase d'explication (buildActionBox),
+                                  boutons principaux (Exporter et partager, Export ZIP local,
+                                  Importer) en vert (`btn-primary`) ; pas de liste de golfs ici
                                   (voir Gestion parcours)
     courseManage.js               Sous-menu Gestion parcours (icônes, dont une icône
                                    satellite classique agrandie pour Calibrer avec le GPS,
@@ -220,7 +234,10 @@ src/
                                        ex: "+20"/"-2"/"0" ; en-tête Stableford net sur 2
                                        lignes pour laisser plus de place à la colonne Golf),
                                        les deux derniers ramenés à 18 trous par règle de
-                                       trois (un tiret uniquement si aucun trou n'a de score)
+                                       trois (un tiret uniquement si aucun trou n'a de score) ;
+                                       icône poubelle en bout de ligne (confirmation avec
+                                       date+golf, stopPropagation pour ne pas ouvrir la
+                                       partie), même suppression que l'Historique
     roundNew.js                      Démarrage d'une partie (golf, départ, météo, GPS) ;
                                        liste de golfs triée via sortCoursesByName ; bouton
                                        d'aide
@@ -280,7 +297,8 @@ src/
 
 ## Modèle de données (IndexedDB)
 
-- **Player** *(singleton)* : `gender`, `firstName`, `lastName`, `handicapIndex`, `appMode`
+- **Player** *(singleton)* : `gender`, `trigram` (3 lettres A-Z, depuis la 1.2.58 — remplace
+  `firstName`/`lastName`, cf. "Pseudonymisation" plus bas), `handicapIndex`, `appMode`
   (`"expert" | "simplified"`)
 - **Club** : `id`, `name`, `order`, `targetDistance`
 - **Course** : `id`, `name`, `location`, `source`
@@ -324,6 +342,52 @@ l'ancien champ par sécurité. Rien n'est réécrit en base tant que le golf n'e
 réenregistré (calibration, édition...) — un export JSON/ZIP réalisé en 1.2.54 ou antérieur
 s'importe donc sans erreur en 1.2.55.
 
+### Pseudonymisation du joueur (trigramme)
+
+Depuis la 1.2.58, `Player.firstName`/`lastName` sont remplacés par `Player.trigram` (3
+lettres). Migration à la lecture dans `src/db/repository.js` (`getPlayer`,
+`migratePlayerRecord`) : un ancien `Player` sans trigramme en reçoit un dérivé
+(initiales du prénom + 1re lettre du nom) et `firstName`/`lastName` sont retirés
+**immédiatement et persistés** (pas d'attente d'un prochain enregistrement, à la différence
+de la migration `greenPositions` ci-dessus) — l'utilisateur voit le trigramme proposé dans
+Réglages et peut le corriger. Le même retraitement s'applique à l'import d'un export
+antérieur (`importExportData`) : `firstName`/`lastName` ne sont jamais écrits en base, même
+temporairement.
+
+### Sauvegarde côté serveur (`data/`)
+
+Le dossier `data/` (racine du dépôt, servi tel quel par GitHub Pages) héberge des
+sauvegardes optionnelles, proposées à l'utilisateur :
+- **automatiquement** au démarrage si la base locale est entièrement vide (aucun Player,
+  Club, Course ou Round) — jamais sinon ;
+- **à la demande** depuis Réglages > Sauvegarde/Partage > "Restaurer depuis le serveur".
+
+Structure :
+```
+data/
+  index.json          # seule source des sauvegardes proposées (GitHub Pages ne liste pas
+                       # un dossier) : { "backups": [{ file, label, date, content }] }
+                       # content: "courses" (parcours seuls) ou "full" (export complet)
+  *.zip               # fichiers au format d'export standard de l'app (buildExportZipFile)
+```
+`index.json` est régénéré par `tools/update-data-index.ps1` (PowerShell) à partir des ZIP
+présents dans `data/` — ne jamais l'éditer à la main. Le choix d'une sauvegarde est toujours
+manuel (jamais d'import automatique, même s'il n'y en a qu'une) ; un `index.json` absent,
+vide ou injoignable (hors-ligne) n'affiche rien et ne bloque rien. Le Service Worker ne
+pré-cache jamais `data/` et le lit toujours réseau-only (fichiers volumineux, et le but est
+d'avoir la dernière version).
+
+**Confidentialité — le dépôt GitHub est public.** Tout fichier déposé dans `data/` est
+téléchargeable par n'importe qui. Le nom est remplacé par un trigramme (voir ci-dessus),
+mais un export reste par ailleurs identifiable (handicap, dates, golfs, scores). Avant de
+déposer un ZIP :
+1. Exporter depuis Réglages — "Exporter les parcours seulement" (aucune donnée personnelle)
+   si c'est suffisant, sinon un export complet en connaissance de cause.
+2. Copier le ZIP dans `data/`.
+3. Lancer `tools/update-data-index.ps1` — il **refuse** (n'ajoute pas à `index.json`, avec un
+   avertissement) tout ZIP dont le JSON contient encore un `firstName`/`lastName` non vide.
+4. `git push`.
+
 ## Historique des versions
 
 | Version | Contenu |
@@ -347,6 +411,7 @@ s'importe donc sans erreur en 1.2.55.
 | 1.2.56 | **Audit tri/casse des listes de golfs** : la règle posée en 1.2.51 (tri alphabétique insensible à la casse + casse phrase, partout) n'était en réalité appliquée qu'à Gestion parcours — `sortCoursesByName` (`src/ui/formHelpers.js`) créé comme seul point de vérité et appliqué aussi à Modifier parcours, Supprimer parcours, Calibration GPS, Nouvelle partie et au filtre Golf partagé (`src/ui/filters.js`, Reprendre une partie/Historique/Statistiques) ; **graphiques Statistiques** : jusqu'à 3 graduations numériques sur l'axe Y (min, max, + valeur de la moyenne si elle ne chevauche pas les deux autres), ligne de moyenne recolorée en orange (`--color-chart-average`) au lieu de rouge, volontairement distincte de l'ambre déjà utilisé par la ligne objectif ; **écran de jeu** : case "En régulation sur green" et son libellé alignés sur une seule ligne (`createCheckboxField`, `src/ui/formHelpers.js`) au lieu d'être empilés |
 
 | 1.2.57 | **Écran de jeu** : bouton de bascule rapide Expert/Novice en haut à gauche (même ligne que le bouton d'aide) — même réglage `Player.appMode` que Réglages, change immédiatement l'affichage de l'écran en cours sans y passer ; **export PDF Carte de score** : correctif — la colonne Putts de la ligne "Total" affichait par erreur la moyenne au lieu de la somme réelle, désormais corrigée, avec une ligne "Moyenne putts" séparée en dessous ; nouveau **bouton "Export" en Statistiques** : PDF récapitulatif (valeurs chiffrées uniquement, pas de graphiques) pour les filtres Golf/Année/Mois/Club actuellement sélectionnés, via `src/export/statsPdf.js` et `buildStatsExportSummary` (`src/views/stats.js`, réutilise les mêmes fonctions de calcul que l'écran) — putts objectif et réel affichés sur les deux échelles (total/18 trous et moyenne/trou) pour rester comparables ; chargement de jsPDF factorisé dans `src/export/pdfLib.js`, partagé entre `roundPdf.js` et `statsPdf.js` |
+| 1.2.58 | **Réglages** : "Télécharger (ZIP)" renommé "Export ZIP local" ; ce bouton et "Importer" passent en vert (`btn-primary`, comme "Exporter et partager") ; nouveau bouton "Exporter les parcours seulement" (`buildCoursesOnlyExportData`) ; **pseudonymisation** : `Player.firstName`/`lastName` remplacés par `Player.trigram` (3 lettres), migration immédiate et persistée à la lecture (`migratePlayerRecord`), y compris à l'import d'un ancien export ; **Reprendre une partie** : icône poubelle par ligne (confirmation, `stopPropagation`), même suppression que l'Historique ; nouvelle **sauvegarde côté serveur** : dossier `data/` (index.json + ZIP, régénéré par `tools/update-data-index.ps1` avec garde-fou anti-nom), proposée automatiquement si la base est entièrement vide au démarrage (`src/import/serverRestore.js`) ou à la demande depuis Réglages, réutilisant le chemin d'import existant ; Service Worker : `data/` jamais pré-caché, toujours lu réseau-only |
 
 ## Tenir ce README à jour
 

@@ -51,8 +51,37 @@ export function generateId(prefix) {
 
 const PLAYER_ID = 'player-1';
 
+// Dérive un trigramme candidat à partir d'un ancien prénom/nom (purgés juste après) — pure
+// heuristique de départ, toujours affichée pour validation/correction par l'utilisateur
+// dans Réglages, jamais utilisée telle quelle sans qu'il la voie.
+function deriveTrigram(firstName, lastName) {
+  const raw = `${(firstName ?? '').trim().slice(0, 2)}${(lastName ?? '').trim().slice(0, 1)}`
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '');
+  return (raw + 'XXX').slice(0, 3);
+}
+
+// Migration à la lecture (depuis la 1.2.58) : Player.firstName/lastName sont remplacés par
+// un trigramme unique (pseudonymisation — les exports peuvent être hébergés publiquement,
+// cf. README.md). Si un trigramme existe déjà, les anciens champs sont simplement retirés
+// s'ils traînent encore (ex: import d'un vieil export) ; sinon un trigramme est dérivé une
+// fois, à charge pour l'utilisateur de le valider/corriger dans Réglages. Persisté
+// immédiatement (contrairement à la migration de golf, non bloquante) pour que
+// firstName/lastName ne subsistent nulle part après le premier getPlayer().
+export function migratePlayerRecord(player) {
+  if (!player) return player;
+  if (!('firstName' in player) && !('lastName' in player)) return player;
+  const { firstName, lastName, ...rest } = player;
+  if (rest.trigram) return rest;
+  return { ...rest, trigram: deriveTrigram(firstName, lastName) };
+}
+
 export async function getPlayer() {
-  return (await getRecord(STORES.PLAYER, PLAYER_ID)) ?? null;
+  const record = await getRecord(STORES.PLAYER, PLAYER_ID);
+  if (!record) return null;
+  const migrated = migratePlayerRecord(record);
+  if (migrated !== record) await putRecord(STORES.PLAYER, migrated);
+  return migrated;
 }
 
 export async function savePlayer(data) {

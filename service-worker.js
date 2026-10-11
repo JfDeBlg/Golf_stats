@@ -2,7 +2,7 @@
 // CACHE_NAME embarque la version de l'app pour forcer l'invalidation du cache à chaque
 // nouveau lot déployé — garder ce numéro synchronisé avec src/version.js (APP_VERSION).
 
-const CACHE_NAME = 'golf-app-cache-v1.2.57';
+const CACHE_NAME = 'golf-app-cache-v1.2.58';
 const ASSETS = [
   './',
   './index.html',
@@ -33,6 +33,7 @@ const ASSETS = [
   './src/data/shotOptions.js',
   './src/data/puttsObjectiveTable.js',
   './src/import/pdfScorecard.js',
+  './src/import/serverRestore.js',
   './src/export/roundPdf.js',
   './src/export/statsPdf.js',
   './src/export/pdfLib.js',
@@ -78,6 +79,15 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // data/ (sauvegardes serveur, cf. README.md) n'est jamais pré-caché et toujours lu
+  // réseau-only : fichiers volumineux, et le point de la fonctionnalité est d'obtenir la
+  // dernière version de index.json/des ZIP, pas une copie figée à l'installation du SW.
+  const url = new URL(event.request.url);
+  if (url.pathname.includes('/data/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {

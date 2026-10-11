@@ -4,10 +4,13 @@
 
 import { getPlayer, savePlayer, getClubs, saveClub, deleteClub } from '../db/repository.js';
 import {
-  buildExportData, buildExportZipFile, shareOrDownloadZip, downloadZipFile, readExportFile, importExportData,
+  buildExportData, buildCoursesOnlyExportData, buildExportZipFile, shareOrDownloadZip, downloadZipFile,
+  readExportFile, importExportData,
 } from '../db/exportImport.js';
 import { createField } from '../ui/formHelpers.js';
 import { createIcon } from '../ui/icons.js';
+import { createHelpButton } from '../ui/helpOverlay.js';
+import { promptServerRestore } from '../import/serverRestore.js';
 import { STANDARD_CLUBS } from '../data/standardClubs.js';
 
 const MAX_CLUBS = 14;
@@ -23,11 +26,17 @@ async function buildProfileSection() {
   const section = document.createElement('section');
   section.className = 'card';
 
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row screen-header-row-split';
   const title = document.createElement('h2');
   title.textContent = 'Profil';
-  section.appendChild(title);
+  headerRow.appendChild(title);
+  headerRow.appendChild(createHelpButton(
+    'Le trigramme remplace votre nom dans l\'app et dans les exports, pour que vos sauvegardes puissent être hébergées (y compris sur le dépôt public GitHub) sans vous identifier directement.'
+  ));
+  section.appendChild(headerRow);
 
-  const player = (await getPlayer()) ?? { gender: 'H', firstName: '', lastName: '', handicapIndex: 0, appMode: 'expert' };
+  const player = (await getPlayer()) ?? { gender: 'H', trigram: '', handicapIndex: 0, appMode: 'expert' };
 
   const form = document.createElement('form');
   form.className = 'form';
@@ -45,15 +54,16 @@ async function buildProfileSection() {
   });
   form.appendChild(createField('Genre', genderSelect));
 
-  const firstNameInput = document.createElement('input');
-  firstNameInput.type = 'text';
-  firstNameInput.value = player.firstName ?? '';
-  form.appendChild(createField('Prénom', firstNameInput));
-
-  const lastNameInput = document.createElement('input');
-  lastNameInput.type = 'text';
-  lastNameInput.value = player.lastName ?? '';
-  form.appendChild(createField('Nom', lastNameInput));
+  const trigramInput = document.createElement('input');
+  trigramInput.type = 'text';
+  trigramInput.maxLength = 3;
+  trigramInput.required = true;
+  trigramInput.style.textTransform = 'uppercase';
+  trigramInput.value = player.trigram ?? '';
+  trigramInput.addEventListener('input', () => {
+    trigramInput.value = trigramInput.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  });
+  form.appendChild(createField('Trigramme', trigramInput));
 
   const handicapInput = document.createElement('input');
   handicapInput.type = 'number';
@@ -86,13 +96,18 @@ async function buildProfileSection() {
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!/^[A-Z]{3}$/.test(trigramInput.value)) {
+      statusEl.className = 'error-msg';
+      statusEl.textContent = 'Le trigramme doit comporter exactement 3 lettres.';
+      return;
+    }
     await savePlayer({
       gender: genderSelect.value,
-      firstName: firstNameInput.value.trim(),
-      lastName: lastNameInput.value.trim(),
+      trigram: trigramInput.value,
       handicapIndex: parseFloat(handicapInput.value) || 0,
       appMode: appModeSelect.value,
     });
+    statusEl.className = 'status-msg';
     statusEl.textContent = 'Profil enregistré.';
     setTimeout(() => { statusEl.textContent = ''; }, 2000);
   });
@@ -275,9 +290,15 @@ function buildBackupSection() {
   const section = document.createElement('section');
   section.className = 'card';
 
+  const headerRow = document.createElement('div');
+  headerRow.className = 'screen-header-row screen-header-row-split';
   const title = document.createElement('h2');
   title.textContent = 'Sauvegarde / Partage';
-  section.appendChild(title);
+  headerRow.appendChild(title);
+  headerRow.appendChild(createHelpButton(
+    'Un export déposé dans le dossier data du dépôt est public. Le nom est remplacé par un trigramme, mais le handicap, les dates, les golfs et les scores restent visibles de tous.'
+  ));
+  section.appendChild(headerRow);
 
   const shareBtn = document.createElement('button');
   shareBtn.type = 'button';
@@ -290,16 +311,25 @@ function buildBackupSection() {
 
   const downloadBtn = document.createElement('button');
   downloadBtn.type = 'button';
-  downloadBtn.className = 'btn-secondary';
-  downloadBtn.textContent = 'Télécharger (ZIP)';
+  downloadBtn.className = 'btn-primary';
+  downloadBtn.textContent = 'Export ZIP local';
   section.appendChild(buildActionBox(
     downloadBtn,
     'Enregistre directement le fichier de sauvegarde sur cet appareil, sans passer par le partage (utile notamment sur ordinateur).'
   ));
 
+  const coursesOnlyBtn = document.createElement('button');
+  coursesOnlyBtn.type = 'button';
+  coursesOnlyBtn.className = 'btn-secondary';
+  coursesOnlyBtn.textContent = 'Exporter les parcours seulement';
+  section.appendChild(buildActionBox(
+    coursesOnlyBtn,
+    'Golfs et calibrations uniquement, sans profil ni parties — pour partager vos parcours avec un tiers, ou déposer une sauvegarde publique sans donnée personnelle.'
+  ));
+
   const importBtn = document.createElement('button');
   importBtn.type = 'button';
-  importBtn.className = 'btn-secondary';
+  importBtn.className = 'btn-primary';
   importBtn.textContent = 'Importer';
   const importBox = buildActionBox(
     importBtn,
@@ -312,6 +342,15 @@ function buildBackupSection() {
   fileInput.hidden = true;
   importBox.appendChild(fileInput);
   section.appendChild(importBox);
+
+  const restoreBtn = document.createElement('button');
+  restoreBtn.type = 'button';
+  restoreBtn.className = 'btn-secondary';
+  restoreBtn.textContent = 'Restaurer depuis le serveur';
+  section.appendChild(buildActionBox(
+    restoreBtn,
+    'Propose les sauvegardes hébergées sur le serveur (nouvel appareil, parcours à récupérer). Remplace toutes les données actuelles après confirmation.'
+  ));
 
   const statusEl = document.createElement('p');
   statusEl.className = 'hint';
@@ -350,6 +389,48 @@ function buildBackupSection() {
       statusEl.textContent = `Export impossible : ${err.message}`;
     } finally {
       downloadBtn.disabled = false;
+    }
+  });
+
+  coursesOnlyBtn.addEventListener('click', async () => {
+    statusEl.className = 'hint';
+    statusEl.textContent = "Préparation de l'export…";
+    coursesOnlyBtn.disabled = true;
+    try {
+      const exportData = await buildCoursesOnlyExportData();
+      const zipFile = await buildExportZipFile(exportData, 'golf-app-courses');
+      downloadZipFile(zipFile);
+      statusEl.className = 'status-msg';
+      statusEl.textContent = 'Fichier ZIP (parcours) téléchargé.';
+    } catch (err) {
+      statusEl.className = 'error-msg';
+      statusEl.textContent = `Export impossible : ${err.message}`;
+    } finally {
+      coursesOnlyBtn.disabled = false;
+    }
+  });
+
+  restoreBtn.addEventListener('click', async () => {
+    statusEl.className = 'hint';
+    statusEl.textContent = 'Recherche des sauvegardes disponibles…';
+    restoreBtn.disabled = true;
+    try {
+      const result = await promptServerRestore({ requireConfirmBeforeImport: true });
+      if (result === 'imported') {
+        statusEl.className = 'status-msg';
+        statusEl.textContent = 'Restauration réussie. Rechargement...';
+        setTimeout(() => window.location.reload(), 800);
+        return;
+      }
+      if (result === 'none-available') {
+        statusEl.className = 'hint';
+        statusEl.textContent = 'Aucune sauvegarde disponible sur le serveur.';
+      } else {
+        statusEl.className = 'hint';
+        statusEl.textContent = '';
+      }
+    } finally {
+      restoreBtn.disabled = false;
     }
   });
 

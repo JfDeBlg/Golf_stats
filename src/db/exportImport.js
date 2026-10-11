@@ -9,7 +9,7 @@
 
 import {
   getPlayer, getClubs, getCourses, getRounds,
-  savePlayer, saveClub, saveCourse, saveRound, clearAllData,
+  savePlayer, saveClub, saveCourse, saveRound, clearAllData, migratePlayerRecord,
 } from './repository.js';
 import { APP_VERSION } from '../version.js';
 
@@ -24,6 +24,19 @@ export async function buildExportData() {
     appVersion: APP_VERSION,
     exportedAt: new Date().toISOString(),
     data: { player, clubs, courses, rounds },
+  };
+}
+
+// Export "Parcours seulement" (golfs + calibrations, sans profil ni parties) — utile pour
+// partager des parcours avec un tiers, ou pour déposer une sauvegarde publique (dossier
+// data/, cf. README.md) sans exposer la moindre donnée personnelle.
+export async function buildCoursesOnlyExportData() {
+  const courses = await getCourses();
+  return {
+    exportFormatVersion: EXPORT_FORMAT_VERSION,
+    appVersion: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    data: { player: null, clubs: [], courses, rounds: [] },
   };
 }
 
@@ -51,7 +64,9 @@ export async function importExportData(raw) {
   const { player, clubs, courses, rounds } = validated.data;
 
   await clearAllData();
-  if (player) await savePlayer(player);
+  // Un export antérieur à la 1.2.58 peut encore porter firstName/lastName : jamais stockés,
+  // migrés vers un trigramme (dérivé si absent) dès l'import, comme à la lecture.
+  if (player) await savePlayer(migratePlayerRecord(player));
   await Promise.all(clubs.map((c) => saveClub(c)));
   await Promise.all(courses.map((c) => saveCourse(c)));
   await Promise.all(rounds.map((r) => saveRound(r)));
@@ -81,13 +96,13 @@ function loadJSZip() {
   return jsZipLoadPromise;
 }
 
-export async function buildExportZipFile(exportData) {
+export async function buildExportZipFile(exportData, filePrefix = 'golf-app-export') {
   const JSZip = await loadJSZip();
   const zip = new JSZip();
   const dateStamp = exportData.exportedAt.slice(0, 10).replace(/-/g, '');
-  zip.file(`golf-app-export-${dateStamp}.json`, JSON.stringify(exportData, null, 2));
+  zip.file(`${filePrefix}-${dateStamp}.json`, JSON.stringify(exportData, null, 2));
   const blob = await zip.generateAsync({ type: 'blob' });
-  return new File([blob], `golf-app-export-${dateStamp}.zip`, { type: 'application/zip' });
+  return new File([blob], `${filePrefix}-${dateStamp}.zip`, { type: 'application/zip' });
 }
 
 function triggerFileDownload(file) {

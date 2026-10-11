@@ -16,6 +16,7 @@ import { renderPlay } from './views/play.js';
 import { renderScorecard } from './views/scorecard.js';
 import { renderHistory } from './views/history.js';
 import { renderStats } from './views/stats.js';
+import { isDatabaseEmpty, promptServerRestore } from './import/serverRestore.js';
 
 const routes = {
   menu: { render: renderMenu, title: `GolfStats — v${APP_VERSION}`, showBack: false },
@@ -120,6 +121,15 @@ function renderCurrent() {
 backBtn.addEventListener('click', goBack);
 
 renderCurrent();
+
+// Restauration serveur : ne concerne qu'un premier lancement (base entièrement vide) ;
+// non bloquant, lancé après le premier rendu, jamais si la moindre donnée existe déjà.
+isDatabaseEmpty().then((empty) => {
+  if (!empty) return;
+  return promptServerRestore().then((result) => {
+    if (result === 'imported') window.location.reload();
+  });
+}).catch(() => {});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
